@@ -66,10 +66,16 @@ namespace Kebamm
                 return;
 
             float x = transform.position.x;
-            if (Mouse.current != null && Camera.main != null)
+            var cam = Camera.main;
+            if (Mouse.current != null && cam != null)
             {
                 Vector2 screen = Mouse.current.position.ReadValue();
-                Vector3 world = Camera.main.ScreenToWorldPoint(new Vector3(screen.x, screen.y, 0f));
+                // ScreenToWorldPoint's z is distance from the camera, not world Z.
+                // Camera sits at z=-10 looking at gameplay on z=0.
+                float depth = Mathf.Abs(cam.transform.position.z);
+                if (depth < 0.01f)
+                    depth = 10f;
+                Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
                 x = world.x;
             }
 
