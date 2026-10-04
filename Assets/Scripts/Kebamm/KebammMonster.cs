@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using UnityEngine;
 
 namespace Kebamm
@@ -8,6 +8,7 @@ namespace Kebamm
     public class KebammMonster : MonoBehaviour
     {
         [SerializeField] float maxHealth = 100f;
+        [SerializeField] KebammBallColour colour = KebammBallColour.Red;
 
         float _health;
         SpriteRenderer _sr;
@@ -17,14 +18,16 @@ namespace Kebamm
 
         public float Health => _health;
         public float MaxHealth => maxHealth;
+        public KebammBallColour Colour => colour;
 
-        public void Init(float hp)
+        public void Init(float hp, KebammBallColour ballColour)
         {
             maxHealth = hp;
             _health = hp;
             _defeated = false;
+            colour = ballColour;
             _sr = GetComponent<SpriteRenderer>();
-            _baseColor = new Color(0.75f, 0.22f, 0.55f);
+            _baseColor = KebammVisualFactory.ColourFor(colour);
             _sr.color = _baseColor;
             name = "Monster";
         }
@@ -38,16 +41,23 @@ namespace Kebamm
             if (ball == null || ball.IsPreview)
                 return;
 
-            float damage = (ball.Tier + 1) * 5f;
-            _health = Mathf.Max(0f, _health - damage);
-            Debug.Log($"[Kebamm] Monster hit by {ball.Colour} T{ball.Tier} for {damage} dmg. HP={_health}/{maxHealth}");
+            float ballDamage = ball.Damage;
+            float monsterHealth = _health;
+            float damage = ballDamage - monsterHealth;
+            _health = Mathf.Max(0f, monsterHealth - ballDamage);
+            bool ballBroken = ball.TakeDamage(ballDamage);
+            Debug.Log($"[Kebamm] Impact Damage={damage} (ball {ballDamage} - monster {monsterHealth}). Monster HP={_health}/{maxHealth}. Ball HP={ball.Health}");
+
+            if (_sr == null)
+                _sr = GetComponent<SpriteRenderer>();
+            KebammDamageNumber.Spawn(_sr.bounds, ballDamage);
 
             if (_flashRoutine != null)
                 StopCoroutine(_flashRoutine);
             _flashRoutine = StartCoroutine(Flash());
 
-            // Ball is consumed on impact for a readable prototype loop.
-            Destroy(ball.gameObject);
+            if (ballBroken)
+                Destroy(ball.gameObject);
 
             if (_health <= 0f && !_defeated)
             {

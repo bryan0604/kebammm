@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Kebamm
 {
@@ -13,6 +13,8 @@ namespace Kebamm
         public int Tier { get; private set; }
         public bool IsMerging { get; private set; }
         public bool IsPreview { get; private set; }
+        public float Damage { get; private set; }
+        public float Health { get; private set; }
 
         Rigidbody2D _rb;
         CircleCollider2D _col;
@@ -26,6 +28,9 @@ namespace Kebamm
             Tier = Mathf.Clamp(tier, 0, MaxTier);
             IsPreview = preview;
             IsMerging = false;
+            KebammBallTierData.Resolve(Tier, out float damage, out float hp);
+            Damage = damage;
+            Health = hp;
 
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<CircleCollider2D>();
@@ -60,6 +65,12 @@ namespace Kebamm
             name = $"Ball_{colour}_T{Tier}";
         }
 
+
+        public bool TakeDamage(float amount)
+        {
+            Health = Mathf.Max(0f, Health - amount);
+            return Health <= 0f;
+        }
         public void BeginMerge()
         {
             IsMerging = true;

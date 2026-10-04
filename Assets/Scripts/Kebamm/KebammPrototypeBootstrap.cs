@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace Kebamm
 {
@@ -9,12 +10,12 @@ namespace Kebamm
      *   Any ball whose collider remains overlapping the capacity trigger for 1.0
      *   continuous seconds WHILE settled (Rigidbody2D.linearVelocity magnitude
      *   <= 0.15) opens the container floor/gate. Balls then fall with gravity
-     *   onto the monster below and apply damage = (tier + 1) * 5.
+     *   onto the monsters below and apply damage = (tier + 1) * 5.
      *
      * CONTROLS:
-     *   Mouse X     — aim drop position (clamped inside walls)
-     *   LMB / Space — drop next queued ball (tier 0, random of 4 colours)
-     *   R           — reset container (close floor, clear balls, restore monster HP)
+     *   Mouse X     - aim drop position (clamped inside walls)
+     *   LMB / Space - drop next queued ball (tier 0, random of 4 colours)
+     *   R           - reset container (close floor, clear balls, restore every monster HP)
      *
      * HOW TO RUN:
      *   Open SampleScene and press Play. Auto-bootstrap spawns this component
@@ -31,12 +32,14 @@ namespace Kebamm
         public float WallThickness = 0.25f;
         public float CapacityFromTop = 0.85f;
         public float MonsterY = -5.2f;
-        public float MonsterHealth = 100f;
+        public float GroundWidth = 8f;
+        public float GroundThickness = 0.35f;
+        public float SpawnInset = 0.35f;
 
         KebammContainer _container;
         KebammCapacityMonitor _capacity;
         KebammDropController _dropper;
-        KebammMonster _monster;
+        readonly List<KebammMonster> _monsters = new List<KebammMonster>();
         Transform _ballsRoot;
         Transform _worldRoot;
 
@@ -120,29 +123,17 @@ namespace Kebamm
             ballsGo.transform.SetParent(_worldRoot, false);
             _ballsRoot = ballsGo.transform;
 
-            var monsterGo = new GameObject("Monster");
-            monsterGo.transform.SetParent(_worldRoot, false);
-            monsterGo.transform.position = new Vector3(0f, MonsterY, 0f);
-            monsterGo.transform.localScale = new Vector3(2.4f, 1.1f, 1f);
-            var mSr = monsterGo.AddComponent<SpriteRenderer>();
-            mSr.sprite = KebammVisualFactory.SquareSprite;
-            mSr.sortingOrder = 1;
-            monsterGo.AddComponent<BoxCollider2D>();
-            var mRb = monsterGo.AddComponent<Rigidbody2D>();
-            mRb.bodyType = RigidbodyType2D.Kinematic;
-            mRb.simulated = true;
-            _monster = monsterGo.AddComponent<KebammMonster>();
-            _monster.Init(MonsterHealth);
-
             var groundGo = new GameObject("Ground");
             groundGo.transform.SetParent(_worldRoot, false);
-            groundGo.transform.position = new Vector3(0f, MonsterY - 1.0f, 0f);
+            groundGo.transform.position = new Vector3(0f, MonsterY - 1f, 0f);
             var gSr = groundGo.AddComponent<SpriteRenderer>();
             gSr.sprite = KebammVisualFactory.SquareSprite;
             gSr.color = new Color(0.22f, 0.28f, 0.22f);
             gSr.sortingOrder = 0;
-            groundGo.transform.localScale = new Vector3(8f, 0.35f, 1f);
+            groundGo.transform.localScale = new Vector3(GroundWidth, GroundThickness, 1f);
             groundGo.AddComponent<BoxCollider2D>();
+
+            SpawnMonsters();
 
             var dropGo = new GameObject("DropController");
             dropGo.transform.SetParent(_worldRoot, false);
@@ -151,6 +142,105 @@ namespace Kebamm
             _dropper.Init(this, _container, dropY);
 
             Debug.Log("[Kebamm] Prototype ready. Aim with mouse, drop with LMB/Space, reset with R.");
+        }
+
+        void SpawnMonsters()
+        {
+            _monsters.Clear();
+
+            KebammGameData gameData = Resources.Load<KebammGameData>("Kebamm/GameData");
+            if (gameData == null)
+            {
+                gameData = ScriptableObject.CreateInstance<KebammGameData>();
+                Debug.LogWarning("[Kebamm] GameData missing from Resources; using in-memory defaults.");
+            }
+
+            KebammLevelData levelData = Resources.Load<KebammLevelData>("Kebamm/LevelData");
+            if (levelData == null)
+            {
+                levelData = ScriptableObject.CreateInstance<KebammLevelData>();
+                Debug.LogWarning("[Kebamm] LevelData missing from Resources; using in-memory defaults.");
+            }
+
+            KebammMonsterData[] monsterDatas = Resources.LoadAll<KebammMonsterData>("Kebamm");
+            if (monsterDatas == null || monsterDatas.Length == 0)
+            {
+                monsterDatas = CreateFallbackMonsters();
+                Debug.LogWarning("[Kebamm] MonsterData missing from Resources; using in-memory defaults.");
+            }
+
+            System.Array.Sort(monsterDatas, (a, b) => a.id.CompareTo(b.id));
+
+            int spawnCount = levelData.SpawnCountAtStart();
+            float groundTop = (MonsterY - 1f) + GroundThickness * 0.5f;
+            float halfPlatform = GroundWidth * 0.5f;
+
+            for (int i = 0; i < spawnCount; i++)
+            {
+                KebammMonsterData data = monsterDatas[Random.Range(0, monsterDatas.Length)];
+                float size = gameData.SizeForTier(data.tier);
+                if (size < 0.05f)
+                    size = 0.05f;
+
+                KebammBallColour colour = ColourPool[Random.Range(0, ColourPool.Length)];
+                float reach = halfPlatform - size * 0.5f - SpawnInset;
+                if (reach < 0f)
+                    reach = 0f;
+                float x = Random.Range(-reach, reach);
+                // Square sprite pivot is center, so lift by half the uniform scale to rest on the ground.
+                float y = groundTop + size * 0.5f;
+
+                KebammMonster monster = SpawnMonster(data, size, colour, new Vector3(x, y, 0f));
+                _monsters.Add(monster);
+                Debug.Log($"[Kebamm] Spawned {monster.name} tier={data.tier} hp={data.hp} colour={colour} size={size} x={x:0.00}");
+            }
+        }
+
+        KebammMonster SpawnMonster(KebammMonsterData data, float size, KebammBallColour colour, Vector3 position)
+        {
+            var monsterGo = new GameObject("Monster");
+            monsterGo.transform.SetParent(_worldRoot, false);
+            monsterGo.transform.position = position;
+            monsterGo.transform.localScale = new Vector3(size, size, 1f);
+            var mSr = monsterGo.AddComponent<SpriteRenderer>();
+            mSr.sprite = KebammVisualFactory.SquareSprite;
+            mSr.sortingOrder = 1;
+            monsterGo.AddComponent<BoxCollider2D>();
+            var mRb = monsterGo.AddComponent<Rigidbody2D>();
+            mRb.bodyType = RigidbodyType2D.Kinematic;
+            mRb.simulated = true;
+            var monster = monsterGo.AddComponent<KebammMonster>();
+            float hp = data != null ? data.hp : 100f;
+            monster.Init(hp, colour);
+            if (data != null && !string.IsNullOrEmpty(data.name))
+                monsterGo.name = data.name;
+            return monster;
+        }
+
+        static KebammMonsterData[] CreateFallbackMonsters()
+        {
+            int[] ids = { 0, 1, 2 };
+            float[] hps = { 100f, 200f, 300f };
+            int[] tiers = { 1, 2, 3 };
+            string[] names =
+            {
+                "monster_01_basic_tier_01",
+                "monster_01_basic_tier_02",
+                "monster_01_basic_tier_03"
+            };
+
+            var result = new KebammMonsterData[ids.Length];
+            for (int i = 0; i < ids.Length; i++)
+            {
+                KebammMonsterData data = ScriptableObject.CreateInstance<KebammMonsterData>();
+                data.id = ids[i];
+                data.hp = hps[i];
+                data.tier = tiers[i];
+                data.name = names[i];
+                result[i] = data;
+            }
+
+            return result;
         }
 
         public KebammBallColour NextQueuedColour()
@@ -190,11 +280,16 @@ namespace Kebamm
 
             _capacity?.ResetTimers();
             _container?.CloseFloor();
-            _monster?.ResetHealth();
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                if (_monsters[i] != null)
+                    _monsters[i].ResetHealth();
+            }
+
             _dropper?.ClearPreview();
             _dropper?.SetDroppingEnabled(true);
             _dropper?.SpawnPreview();
-            Debug.Log("[Kebamm] Session reset — container rebuilt for another drop round");
+            Debug.Log("[Kebamm] Session reset - container rebuilt for another drop round");
         }
     }
 }
