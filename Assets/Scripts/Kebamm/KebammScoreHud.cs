@@ -16,6 +16,9 @@ namespace Kebamm
         public static KebammScoreHud Instance { get; private set; }
 
         TextMeshProUGUI _scoreValue;
+        TextMeshProUGUI _levelValue;
+        TextMeshProUGUI _endLevelValue;
+        TextMeshProUGUI _endNextLevelValue;
         TextMeshProUGUI _endMergeValue;
         TextMeshProUGUI _endMonsterValue;
         TextMeshProUGUI _endFinalValue;
@@ -68,6 +71,8 @@ namespace Kebamm
 
             _scoreValue = CreateLabel(canvasGo.transform, "ScoreHud", "Score: 0", 40f,
                 new Vector2(0.5f, 1f), new Vector2(0f, -72f), new Vector2(960f, 64f));
+            _levelValue = CreateLabel(canvasGo.transform, "LevelHud", "Level 1", 34f,
+                new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(960f, 56f));
 
             _endRoot = new GameObject("EndScreen");
             _endRoot.transform.SetParent(canvasGo.transform, false);
@@ -86,6 +91,8 @@ namespace Kebamm
             dim.color = new Color(0f, 0f, 0f, 0.78f);
             dim.raycastTarget = true;
 
+            _endLevelValue = CreateLabel(_endRoot.transform, "EndLevelValue", "Level 1", 56f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 470f), new Vector2(900f, 80f));
             CreateLabel(_endRoot.transform, "EndMergeLabel", "Merge Score", 36f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 360f), new Vector2(900f, 56f));
             _endMergeValue = CreateLabel(_endRoot.transform, "EndMergeValue", "0", 48f,
@@ -98,6 +105,8 @@ namespace Kebamm
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(900f, 56f));
             _endFinalValue = CreateLabel(_endRoot.transform, "EndFinalValue", "0", 96f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(900f, 130f));
+            _endNextLevelValue = CreateLabel(_endRoot.transform, "EndNextLevelValue", "Next: Level 1", 34f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -236f), new Vector2(900f, 56f));
 
             var buttonGo = new GameObject("NextLevel");
             buttonGo.transform.SetParent(_endRoot.transform, false);
@@ -105,7 +114,7 @@ namespace Kebamm
             buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
             buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
             buttonRect.pivot = new Vector2(0.5f, 0.5f);
-            buttonRect.anchoredPosition = new Vector2(0f, -320f);
+            buttonRect.anchoredPosition = new Vector2(0f, -350f);
             buttonRect.sizeDelta = new Vector2(520f, 120f);
             var buttonImage = buttonGo.AddComponent<Image>();
             buttonImage.sprite = KebammVisualFactory.SquareSprite;
@@ -121,6 +130,7 @@ namespace Kebamm
 
             _endRoot.SetActive(false);
             Refresh();
+            RefreshLevel();
         }
 
         public void Refresh()
@@ -135,6 +145,27 @@ namespace Kebamm
                 _endFinalValue.text = KebammScore.FinalScore.ToString();
         }
 
+        public void RefreshLevel()
+        {
+            int current = 1;
+            int next = 1;
+            bool hasNext = false;
+            KebammPrototypeBootstrap bootstrap = KebammPrototypeBootstrap.Instance;
+            if (bootstrap != null)
+            {
+                current = bootstrap.CurrentLevelNumber;
+                next = bootstrap.NextLevelNumber;
+                hasNext = bootstrap.HasNextLevel;
+            }
+
+            if (_levelValue != null)
+                _levelValue.text = "Level " + current;
+            if (_endLevelValue != null)
+                _endLevelValue.text = "Level " + current;
+            if (_endNextLevelValue != null)
+                _endNextLevelValue.text = hasNext ? "Next: Level " + next : "Next: Level " + current + " (last level)";
+        }
+
         public void ShowEnd()
         {
             if (_ended || _endRoot == null)
@@ -143,6 +174,7 @@ namespace Kebamm
             _ended = true;
             KebammScore.Lock();
             Refresh();
+            RefreshLevel();
             _endRoot.SetActive(true);
             if (_endGroup != null)
             {
@@ -178,7 +210,10 @@ namespace Kebamm
         void OnNextLevel()
         {
             if (KebammPrototypeBootstrap.Instance != null)
+            {
                 KebammPrototypeBootstrap.Instance.ResetSession();
+                KebammPrototypeBootstrap.Instance.AdvanceLevel();
+            }
         }
 
         void EnsureEventSystem()

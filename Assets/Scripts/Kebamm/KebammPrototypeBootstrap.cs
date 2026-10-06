@@ -21,13 +21,26 @@ namespace Kebamm
      *   not reset it. Ball velocity does not gate the timer. Idle before the
      *   bombing run does not end the round. There is no countdown.
      *
+     * LEVEL TEXT:
+     *   Active entries come from Resources/Kebamm/Levels/game_level
+     *   (KebammGameLevel). The HUD and end panel show the current entry's
+     *   levelNumber ("Level 1" if the asset is missing). Next Level resets the
+     *   session, then advances to the next active entry and stays on the last.
+     *   Spawning does not use the level values yet.
+     *
+     * MAIN MENU:
+     *   The game opens on KebammMainMenu with gameplay idle (no dropping, no
+     *   preview ball, no idle timer, R ignored). START hides the menu and runs
+     *   ResetSession at the current level. Settings is a placeholder panel
+     *   with Quit and Back.
+     *
      * CONTROLS:
      *   Mouse X     - aim drop position (clamped inside walls)
      *   LMB / Space - drop next queued ball (tier 0, random of 4 colours)
      *   R           - reset container (close floor, clear balls, restore every monster HP)
      *
      * HOW TO RUN:
-     *   Open SampleScene and press Play. Auto-bootstrap spawns this component
+     *   Open SampleScene and press Play, then press START on the main menu. Auto-bootstrap spawns this component
      *   if missing. Or use menu: Kebamm > Add Prototype Bootstrap To Open Scene.
      */
     public class KebammPrototypeBootstrap : MonoBehaviour
@@ -54,6 +67,16 @@ namespace Kebamm
         bool _bombingRun;
         float _bombingIdleTimer;
         const float BombingIdleSeconds = 5f;
+        KebammGameLevel _gameLevel;
+        readonly List<KebammLevel> _activeLevels = new List<KebammLevel>();
+        int _levelIndex;
+        KebammMainMenu _mainMenu;
+
+        public bool InMainMenu => _mainMenu != null && _mainMenu.IsVisible;
+
+        public int CurrentLevelNumber => LevelNumberAt(_levelIndex);
+        public bool HasNextLevel => _levelIndex + 1 < _activeLevels.Count;
+        public int NextLevelNumber => HasNextLevel ? LevelNumberAt(_levelIndex + 1) : CurrentLevelNumber;
 
         static readonly KebammBallColour[] ColourPool =
         {
@@ -77,6 +100,7 @@ namespace Kebamm
         {
             Instance = this;
             EnsurePhysicsMaterial();
+            LoadLevels();
             BuildWorld();
         }
 
@@ -88,6 +112,9 @@ namespace Kebamm
 
         void Update()
         {
+            if (InMainMenu)
+                return;
+
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame)
                 ResetSession();
@@ -160,7 +187,13 @@ namespace Kebamm
             hudGo.AddComponent<KebammScoreHud>().Build();
             KebammScore.ResetScores();
 
-            Debug.Log("[Kebamm] Prototype ready. Aim with mouse, drop with LMB/Space, reset with R.");
+            var menuGo = new GameObject("MainMenu");
+            menuGo.transform.SetParent(transform, false);
+            _mainMenu = menuGo.AddComponent<KebammMainMenu>();
+            _mainMenu.Build();
+            ShowMainMenu();
+
+            Debug.Log("[Kebamm] Prototype ready. Press START, then aim with mouse, drop with LMB/Space, reset with R.");
         }
 
         void SpawnMonsters()
@@ -341,6 +374,56 @@ namespace Kebamm
 
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.ShowEnd();
+        }
+
+        void LoadLevels()
+        {
+            _activeLevels.Clear();
+            _levelIndex = 0;
+            _gameLevel = Resources.Load<KebammGameLevel>("Kebamm/Levels/game_level");
+            if (_gameLevel == null)
+            {
+                Debug.LogWarning("[Kebamm] game_level missing from Resources/Kebamm/Levels; showing Level 1.");
+                return;
+            }
+
+            _activeLevels.AddRange(_gameLevel.GetActiveLevels());
+            if (_activeLevels.Count == 0)
+                Debug.LogWarning("[Kebamm] game_level has no active levels; showing Level 1.");
+        }
+
+        int LevelNumberAt(int index)
+        {
+            if (index < 0 || index >= _activeLevels.Count || _activeLevels[index] == null)
+                return 1;
+            return _activeLevels[index].levelNumber;
+        }
+
+        public void AdvanceLevel()
+        {
+            if (HasNextLevel)
+                _levelIndex++;
+            Debug.Log($"[Kebamm] Current level: {CurrentLevelNumber} (entry {_levelIndex + 1}/{Mathf.Max(1, _activeLevels.Count)})");
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.RefreshLevel();
+        }
+
+        public void ShowMainMenu()
+        {
+            _bombingRun = false;
+            _bombingIdleTimer = 0f;
+            _dropper?.SetDroppingEnabled(false);
+            _dropper?.ClearPreview();
+            if (_mainMenu != null)
+                _mainMenu.Show();
+        }
+
+        public void StartGameFromMenu()
+        {
+            if (_mainMenu != null)
+                _mainMenu.Hide();
+            ResetSession();
+            Debug.Log($"[Kebamm] START pressed - playing Level {CurrentLevelNumber}");
         }
 
         public void ResetSession()
