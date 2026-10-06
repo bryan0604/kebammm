@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Kebamm
@@ -11,6 +11,15 @@ namespace Kebamm
      *   continuous seconds WHILE settled (Rigidbody2D.linearVelocity magnitude
      *   <= 0.15) opens the container floor/gate. Balls then fall with gravity
      *   onto the monsters below and apply damage = (tier + 1) * 5.
+     *   That floor open is the bombing run. It is not a separate trigger.
+     *
+     * SCORE SCREEN:
+     *   After the bombing run starts (container floor opens), show the end
+     *   panel once 5 continuous seconds pass with no gameplay event. Events
+     *   that reset the timer: a monster impact, a real drop (SpawnBall with
+     *   preview false), and a merge (SpawnMergedBall). Preview respawns do
+     *   not reset it. Ball velocity does not gate the timer. Idle before the
+     *   bombing run does not end the round. There is no countdown.
      *
      * CONTROLS:
      *   Mouse X     - aim drop position (clamped inside walls)
@@ -42,6 +51,9 @@ namespace Kebamm
         readonly List<KebammMonster> _monsters = new List<KebammMonster>();
         Transform _ballsRoot;
         Transform _worldRoot;
+        bool _bombingRun;
+        float _bombingIdleTimer;
+        const float BombingIdleSeconds = 5f;
 
         static readonly KebammBallColour[] ColourPool =
         {
@@ -79,6 +91,8 @@ namespace Kebamm
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (kb != null && kb.rKey.wasPressedThisFrame)
                 ResetSession();
+
+            TickBombingRunIdle();
         }
 
         static void EnsurePhysicsMaterial()
@@ -140,6 +154,11 @@ namespace Kebamm
             _dropper = dropGo.AddComponent<KebammDropController>();
             float dropY = containerGo.transform.position.y + ContainerHeight * 0.5f + 0.35f;
             _dropper.Init(this, _container, dropY);
+
+            var hudGo = new GameObject("ScoreHud");
+            hudGo.transform.SetParent(transform, false);
+            hudGo.AddComponent<KebammScoreHud>().Build();
+            KebammScore.ResetScores();
 
             Debug.Log("[Kebamm] Prototype ready. Aim with mouse, drop with LMB/Space, reset with R.");
         }
@@ -211,7 +230,13 @@ namespace Kebamm
             mRb.simulated = true;
             var monster = monsterGo.AddComponent<KebammMonster>();
             float hp = data != null ? data.hp : 100f;
-            monster.Init(hp, colour);
+            int hitPts;
+            int destroyedPts;
+            if (data != null)
+                data.ResolveScore(out hitPts, out destroyedPts);
+            else
+                KebammMonsterData.FallbackPoints(1, out hitPts, out destroyedPts);
+            monster.Init(hp, colour, hitPts, destroyedPts);
             if (data != null && !string.IsNullOrEmpty(data.name))
                 monsterGo.name = data.name;
             return monster;
@@ -222,6 +247,8 @@ namespace Kebamm
             int[] ids = { 0, 1, 2 };
             float[] hps = { 100f, 200f, 300f };
             int[] tiers = { 1, 2, 3 };
+            int[] hitPts = { 13, 26, 52 };
+            int[] destroyedPts = { 250, 500, 1000 };
             string[] names =
             {
                 "monster_01_basic_tier_01",
@@ -236,6 +263,8 @@ namespace Kebamm
                 data.id = ids[i];
                 data.hp = hps[i];
                 data.tier = tiers[i];
+                data.hitPts = hitPts[i];
+                data.destroyedPts = destroyedPts[i];
                 data.name = names[i];
                 result[i] = data;
             }
@@ -258,6 +287,8 @@ namespace Kebamm
             go.AddComponent<Rigidbody2D>();
             var ball = go.AddComponent<KebammBall>();
             ball.Configure(colour, tier, preview);
+            if (!preview)
+                ResetBombingIdleTimer();
             return ball;
         }
 
@@ -268,10 +299,58 @@ namespace Kebamm
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
+            KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
+        }
+
+        public void SetDroppingEnabled(bool enabled)
+        {
+            _dropper?.SetDroppingEnabled(enabled);
+        }
+
+        public void NotifyMonsterImpact()
+        {
+            ResetBombingIdleTimer();
+        }
+
+        void ResetBombingIdleTimer()
+        {
+            if (!_bombingRun)
+                return;
+
+            _bombingIdleTimer = 0f;
+        }
+
+        void TickBombingRunIdle()
+        {
+            if (!_bombingRun && _container != null && _container.IsOpen)
+            {
+                _bombingRun = true;
+                _bombingIdleTimer = 0f;
+                Debug.Log("[Kebamm] Bombing run started from capacity release. Score screen after 5s with no gameplay event.");
+            }
+
+            if (!_bombingRun)
+                return;
+
+            if (KebammScoreHud.Instance != null && KebammScoreHud.Instance.IsEndVisible)
+                return;
+
+            _bombingIdleTimer += Time.deltaTime;
+            if (_bombingIdleTimer < BombingIdleSeconds)
+                return;
+
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.ShowEnd();
         }
 
         public void ResetSession()
         {
+            _bombingRun = false;
+            _bombingIdleTimer = 0f;
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.HideEnd();
+            KebammScore.ResetScores();
+
             if (_ballsRoot != null)
             {
                 for (int i = _ballsRoot.childCount - 1; i >= 0; i--)
