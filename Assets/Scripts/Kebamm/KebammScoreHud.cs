@@ -19,6 +19,13 @@ namespace Kebamm
         TextMeshProUGUI _levelValue;
         TextMeshProUGUI _endLevelValue;
         TextMeshProUGUI _endNextLevelValue;
+        readonly Image[] _stars = new Image[3];
+
+        // Gray-box stars: dark gray slot when unearned, light gray when earned.
+        static readonly Color StarUnearned = new Color(0.32f, 0.32f, 0.35f, 1f);
+        static readonly Color StarEarned = new Color(0.86f, 0.86f, 0.9f, 1f);
+        GameObject _nextButton;
+        Sequence _endSequence;
         TextMeshProUGUI _endMergeValue;
         TextMeshProUGUI _endMonsterValue;
         TextMeshProUGUI _endFinalValue;
@@ -39,6 +46,8 @@ namespace Kebamm
         {
             if (_endGroup != null)
                 _endGroup.DOKill();
+            KillEndSequence();
+            KillStarTweens();
             if (Instance == this)
                 Instance = null;
         }
@@ -92,7 +101,12 @@ namespace Kebamm
             dim.raycastTarget = true;
 
             _endLevelValue = CreateLabel(_endRoot.transform, "EndLevelValue", "Level 1", 56f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 470f), new Vector2(900f, 80f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 600f), new Vector2(900f, 80f));
+
+            // Three gray-box stars under the level text, above Merge Score. Middle one is larger.
+            _stars[0] = CreateStar(_endRoot.transform, "Star1", new Vector2(-160f, 470f), 110f);
+            _stars[1] = CreateStar(_endRoot.transform, "Star2", new Vector2(0f, 485f), 130f);
+            _stars[2] = CreateStar(_endRoot.transform, "Star3", new Vector2(160f, 470f), 110f);
             CreateLabel(_endRoot.transform, "EndMergeLabel", "Merge Score", 36f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 360f), new Vector2(900f, 56f));
             _endMergeValue = CreateLabel(_endRoot.transform, "EndMergeValue", "0", 48f,
@@ -122,6 +136,7 @@ namespace Kebamm
             var button = buttonGo.AddComponent<Button>();
             button.targetGraphic = buttonImage;
             button.onClick.AddListener(OnNextLevel);
+            _nextButton = buttonGo;
 
             var buttonLabel = CreateLabel(buttonGo.transform, "Label", "Next Level", 42f,
                 new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 120f));
@@ -189,13 +204,140 @@ namespace Kebamm
                             _endGroup.alpha = 1f;
                     });
             }
+            PlayEndSequence();
             if (KebammPrototypeBootstrap.Instance != null)
                 KebammPrototypeBootstrap.Instance.SetDroppingEnabled(false);
+        }
+
+        // GDD cue: Score Screen > 1s > Scores Numbers (Merge Score, Monster Score) > 1s > 3 Stars Logics > 2s > Next Button.
+        // Timings come from KebammScoreScreenConfig; each delay counts from the previous step.
+        void PlayEndSequence()
+        {
+            KillEndSequence();
+            KebammScoreScreenConfig config = KebammScoreScreenConfig.Load();
+            int earned = config.StarsForKills(KebammScore.MonstersDestroyed);
+            Debug.Log($"[Kebamm] Stars earned: {earned} (monsters destroyed {KebammScore.MonstersDestroyed})");
+
+            SetScoreNumbersVisible(false);
+            if (_nextButton != null)
+                _nextButton.SetActive(false);
+            PrepareStars(earned);
+
+            _endSequence = DOTween.Sequence()
+                .AppendInterval(config.scoreNumbersDelay)
+                .AppendCallback(() => SetScoreNumbersVisible(true))
+                .AppendInterval(config.starsDelay)
+                .AppendCallback(() => PopStars(earned, config))
+                .AppendInterval(config.nextButtonDelay)
+                .AppendCallback(() =>
+                {
+                    if (_nextButton != null)
+                        _nextButton.SetActive(true);
+                })
+                .SetLink(_endRoot);
+        }
+
+        void KillEndSequence()
+        {
+            if (_endSequence != null)
+            {
+                _endSequence.Kill();
+                _endSequence = null;
+            }
+        }
+
+        void SetScoreNumbersVisible(bool visible)
+        {
+            if (_endMergeValue != null)
+                _endMergeValue.gameObject.SetActive(visible);
+            if (_endMonsterValue != null)
+                _endMonsterValue.gameObject.SetActive(visible);
+        }
+
+        // Unearned stars show as dark gray slots straight away; earned stars wait at scale 0 for the pop.
+        void PrepareStars(int earned)
+        {
+            KillStarTweens();
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                Image star = _stars[i];
+                if (star == null)
+                    continue;
+
+                bool isEarned = i < earned;
+                star.color = isEarned ? StarEarned : StarUnearned;
+                star.transform.localScale = isEarned ? Vector3.zero : Vector3.one;
+            }
+        }
+
+        void PopStars(int earned, KebammScoreScreenConfig config)
+        {
+            for (int i = 0; i < _stars.Length && i < earned; i++)
+            {
+                Image star = _stars[i];
+                if (star == null)
+                    continue;
+
+                Transform tr = star.transform;
+                tr.DOKill();
+                tr.localScale = Vector3.zero;
+                tr.DOScale(1f, config.starPopDuration)
+                    .SetDelay(config.starPopStagger * i)
+                    .SetEase(Ease.OutBack)
+                    .SetLink(star.gameObject)
+                    .OnKill(() =>
+                    {
+                        if (tr != null)
+                            tr.localScale = Vector3.one;
+                    });
+            }
+        }
+        void KillStarTweens()
+        {
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                if (_stars[i] != null)
+                    _stars[i].transform.DOKill();
+            }
+        }
+
+        void ResetStars()
+        {
+            KillStarTweens();
+            for (int i = 0; i < _stars.Length; i++)
+            {
+                if (_stars[i] == null)
+                    continue;
+                _stars[i].transform.localScale = Vector3.one;
+                _stars[i].color = StarUnearned;
+            }
+        }
+
+        Image CreateStar(Transform parent, string starName, Vector2 anchored, float size)
+        {
+            var go = new GameObject(starName);
+            go.transform.SetParent(parent, false);
+            var rect = go.AddComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchored;
+            rect.sizeDelta = new Vector2(size, size);
+            var image = go.AddComponent<Image>();
+            image.sprite = KebammVisualFactory.SquareSprite;
+            image.color = StarUnearned;
+            image.raycastTarget = false;
+            return image;
         }
 
         public void HideEnd()
         {
             _ended = false;
+            KillEndSequence();
+            ResetStars();
+            SetScoreNumbersVisible(true);
+            if (_nextButton != null)
+                _nextButton.SetActive(true);
             if (_endGroup != null)
             {
                 _endGroup.DOKill();

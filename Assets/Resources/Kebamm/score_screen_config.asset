@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7abb0ea1f2d74be6a387472745c50eda, type: 3}
+  m_Name: score_screen_config
+  m_EditorClassIdentifier: 
+  scoreNumbersDelay: 1
+  starsDelay: 1
+  nextButtonDelay: 2
+  starPopDuration: 0.35
+  starPopStagger: 0.18
+  star1Kills: 1
+  star2Kills: 3
+  star3Kills: 5

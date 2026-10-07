@@ -10,6 +10,8 @@ namespace Kebamm
         public static int MergeScore { get; private set; }
         public static int MonsterScore { get; private set; }
         public static int FinalScore => MergeScore + MonsterScore;
+        public static int MonstersDestroyed { get; private set; }
+
 
         public static event Action Changed;
 
@@ -18,6 +20,7 @@ namespace Kebamm
             _locked = false;
             MergeScore = 0;
             MonsterScore = 0;
+            MonstersDestroyed = 0;
             Changed?.Invoke();
         }
 
@@ -52,7 +55,8 @@ namespace Kebamm
                 return;
 
             MonsterScore += points;
-            Debug.Log($"[Kebamm] Monster destroy score +{points} total={MonsterScore}");
+            MonstersDestroyed++;
+            Debug.Log($"[Kebamm] Monster destroy score +{points} total={MonsterScore} destroyed={MonstersDestroyed}");
             Changed?.Invoke();
         }
     }
