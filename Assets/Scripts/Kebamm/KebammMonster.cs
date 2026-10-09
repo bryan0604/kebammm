@@ -15,6 +15,8 @@ namespace Kebamm
         int _destroyedPts;
         SpriteRenderer _sr;
         Color _baseColor;
+        Color _hitFlashColor = Color.white;
+        bool _usesArt;
         Coroutine _flashRoutine;
         bool _defeated;
 
@@ -22,6 +24,7 @@ namespace Kebamm
         public float MaxHealth => maxHealth;
         public KebammBallColour Colour => colour;
         public bool IsDefeated => _defeated;
+        public bool UsesArt => _usesArt;
 
         public void Init(float hp, KebammBallColour ballColour, int hitPts, int destroyedPts)
         {
@@ -32,9 +35,28 @@ namespace Kebamm
             _destroyedPts = destroyedPts;
             colour = ballColour;
             _sr = GetComponent<SpriteRenderer>();
-            _baseColor = KebammVisualFactory.ColourFor(colour);
-            _sr.color = _baseColor;
+            ApplyLook();
             name = "Monster";
+        }
+
+        // Colours with art in KebammMonsterVisuals (e.g. blue) use the sprite untinted; the rest keep the tinted square.
+        // The collider is left as spawned (1 x 1 box); art sprites are imported so the visible body is about 1 x 1 unit.
+        void ApplyLook()
+        {
+            Sprite art = KebammMonsterVisuals.SpriteFor(colour);
+            _usesArt = art != null;
+            if (_usesArt)
+            {
+                _sr.sprite = art;
+                _baseColor = KebammMonsterVisuals.TintFor();
+                _hitFlashColor = KebammMonsterVisuals.HitFlashFor();
+            }
+            else
+            {
+                _baseColor = KebammVisualFactory.ColourFor(colour);
+                _hitFlashColor = Color.white;
+            }
+            _sr.color = _baseColor;
         }
 
         void OnCollisionEnter2D(Collision2D collision)
@@ -78,7 +100,7 @@ namespace Kebamm
 
         IEnumerator Flash()
         {
-            _sr.color = Color.white;
+            _sr.color = _hitFlashColor;
             yield return new WaitForSeconds(0.08f);
             if (!_defeated)
                 _sr.color = _baseColor;

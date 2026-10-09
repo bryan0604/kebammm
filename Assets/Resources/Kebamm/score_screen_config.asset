@@ -20,3 +20,5 @@ MonoBehaviour:
   star1Kills: 1
   star2Kills: 3
   star3Kills: 5
+  starUnearnedColor: {r: 0.5, g: 0.5, b: 0.52, a: 1}
+  starEarnedColor: {r: 1, g: 0.84, b: 0.15, a: 1}

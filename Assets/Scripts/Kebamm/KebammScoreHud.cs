@@ -21,9 +21,9 @@ namespace Kebamm
         TextMeshProUGUI _endNextLevelValue;
         readonly Image[] _stars = new Image[3];
 
-        // Gray-box stars: dark gray slot when unearned, light gray when earned.
-        static readonly Color StarUnearned = new Color(0.32f, 0.32f, 0.35f, 1f);
-        static readonly Color StarEarned = new Color(0.86f, 0.86f, 0.9f, 1f);
+        // Placeholder white star, tinted grey (unearned) or yellow (earned) from score_screen_config. Replace at polish.
+        const string StarSpritePath = "Kebamm/UI/star_placeholder";
+        static Sprite _starSprite;
         GameObject _nextButton;
         Sequence _endSequence;
         TextMeshProUGUI _endMergeValue;
@@ -103,7 +103,7 @@ namespace Kebamm
             _endLevelValue = CreateLabel(_endRoot.transform, "EndLevelValue", "Level 1", 56f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, 600f), new Vector2(900f, 80f));
 
-            // Three gray-box stars under the level text, above Merge Score. Middle one is larger.
+            // Three stars under the level text, above Merge Score. Middle one is larger.
             _stars[0] = CreateStar(_endRoot.transform, "Star1", new Vector2(-160f, 470f), 110f);
             _stars[1] = CreateStar(_endRoot.transform, "Star2", new Vector2(0f, 485f), 130f);
             _stars[2] = CreateStar(_endRoot.transform, "Star3", new Vector2(160f, 470f), 110f);
@@ -254,10 +254,11 @@ namespace Kebamm
                 _endMonsterValue.gameObject.SetActive(visible);
         }
 
-        // Unearned stars show as dark gray slots straight away; earned stars wait at scale 0 for the pop.
+        // Unearned stars show grey straight away; earned stars turn yellow and wait at scale 0 for the pop.
         void PrepareStars(int earned)
         {
             KillStarTweens();
+            KebammScoreScreenConfig config = KebammScoreScreenConfig.Load();
             for (int i = 0; i < _stars.Length; i++)
             {
                 Image star = _stars[i];
@@ -265,7 +266,7 @@ namespace Kebamm
                     continue;
 
                 bool isEarned = i < earned;
-                star.color = isEarned ? StarEarned : StarUnearned;
+                star.color = isEarned ? config.starEarnedColor : config.starUnearnedColor;
                 star.transform.localScale = isEarned ? Vector3.zero : Vector3.one;
             }
         }
@@ -309,7 +310,7 @@ namespace Kebamm
                 if (_stars[i] == null)
                     continue;
                 _stars[i].transform.localScale = Vector3.one;
-                _stars[i].color = StarUnearned;
+                _stars[i].color = KebammScoreScreenConfig.Load().starUnearnedColor;
             }
         }
 
@@ -324,10 +325,89 @@ namespace Kebamm
             rect.anchoredPosition = anchored;
             rect.sizeDelta = new Vector2(size, size);
             var image = go.AddComponent<Image>();
-            image.sprite = KebammVisualFactory.SquareSprite;
-            image.color = StarUnearned;
+            image.sprite = StarSprite;
+            image.preserveAspect = true;
+            image.color = KebammScoreScreenConfig.Load().starUnearnedColor;
             image.raycastTarget = false;
             return image;
+        }
+
+        // Loads Resources/Kebamm/UI/star_placeholder as a Sprite. If it was imported as a plain texture,
+        // wrap it in a sprite; if it is missing, draw a white star at runtime.
+        static Sprite StarSprite
+        {
+            get
+            {
+                if (_starSprite != null)
+                    return _starSprite;
+
+                _starSprite = Resources.Load<Sprite>(StarSpritePath);
+                if (_starSprite == null)
+                {
+                    Texture2D tex = Resources.Load<Texture2D>(StarSpritePath);
+                    if (tex != null)
+                        _starSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                }
+                if (_starSprite == null)
+                {
+                    Debug.LogWarning("[Kebamm] star_placeholder missing from Resources/Kebamm/UI; drawing a star at runtime.");
+                    _starSprite = BuildStarSprite(128);
+                }
+                return _starSprite;
+            }
+        }
+
+        static Sprite BuildStarSprite(int size)
+        {
+            // Five-pointed star, point up, same proportions as star_placeholder.png. 4x4 supersampling for soft edges.
+            var points = new Vector2[10];
+            float outer = size * 0.47f;
+            float inner = outer * 0.48f;
+            var center = new Vector2(size * 0.5f, size * 0.5f - size * 0.025f);
+            for (int i = 0; i < 10; i++)
+            {
+                float angle = Mathf.PI * 0.5f + i * Mathf.PI / 5f;
+                float radius = i % 2 == 0 ? outer : inner;
+                points[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+            }
+
+            const int samples = 4;
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    int hits = 0;
+                    for (int sy = 0; sy < samples; sy++)
+                    for (int sx = 0; sx < samples; sx++)
+                    {
+                        var p = new Vector2(x + (sx + 0.5f) / samples, y + (sy + 0.5f) / samples);
+                        if (InsidePolygon(points, p))
+                            hits++;
+                    }
+                    byte alpha = (byte)(255 * hits / (samples * samples));
+                    pixels[y * size + x] = new Color32(255, 255, 255, alpha);
+                }
+            }
+
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            tex.wrapMode = TextureWrapMode.Clamp;
+            tex.filterMode = FilterMode.Bilinear;
+            tex.SetPixels32(pixels);
+            tex.Apply();
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f);
+        }
+
+        static bool InsidePolygon(Vector2[] poly, Vector2 p)
+        {
+            bool inside = false;
+            for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
+            {
+                if ((poly[i].y > p.y) != (poly[j].y > p.y) &&
+                    p.x < (poly[j].x - poly[i].x) * (p.y - poly[i].y) / (poly[j].y - poly[i].y) + poly[i].x)
+                    inside = !inside;
+            }
+            return inside;
         }
 
         public void HideEnd()

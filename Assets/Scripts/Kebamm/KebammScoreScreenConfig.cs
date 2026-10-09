@@ -30,6 +30,16 @@ namespace Kebamm
         [Tooltip("Monsters killed needed for 2 stars.")] public int star2Kills = 3;
         [Tooltip("Monsters killed needed for 3 stars.")] public int star3Kills = 5;
 
+        // Notion 'Game UI — 3 Stars': default colour grey, attained stars change to yellow.
+        [Header("Star colours (tint on the white star sprite)")]
+        [Tooltip("Colour of a star that has not been earned.")]
+        public Color starUnearnedColor = DefaultStarUnearnedColor;
+        [Tooltip("Colour of an earned star.")]
+        public Color starEarnedColor = DefaultStarEarnedColor;
+
+        public static readonly Color DefaultStarUnearnedColor = new Color(0.5f, 0.5f, 0.52f, 1f);
+        public static readonly Color DefaultStarEarnedColor = new Color(1f, 0.84f, 0.15f, 1f);
+
         static KebammScoreScreenConfig _cached;
 
         public static KebammScoreScreenConfig Load()

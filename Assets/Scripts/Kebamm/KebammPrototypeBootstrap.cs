@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Kebamm
 {
@@ -89,11 +90,24 @@ namespace Kebamm
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void AutoBootstrap()
         {
+            if (!IsGameScene(SceneManager.GetActiveScene()))
+                return;
+
             if (FindFirstObjectByType<KebammPrototypeBootstrap>() != null)
                 return;
 
             var go = new GameObject("KebammPrototype");
             go.AddComponent<KebammPrototypeBootstrap>();
+        }
+
+        // Auto-start only in game scenes: scenes listed in Build Settings (buildIndex >= 0, currently
+        // Assets/Scenes/SampleScene.unity), excluding anything under a Samples folder.
+        // Sample scenes such as Assets/Kebamm/Samples/SlimeWalk/SlimeWalkSample.unity and unsaved scenes stay untouched.
+        static bool IsGameScene(Scene scene)
+        {
+            if (!scene.IsValid() || scene.buildIndex < 0)
+                return false;
+            return !scene.path.Replace('\\', '/').Contains("/Samples/");
         }
 
         void Awake()
