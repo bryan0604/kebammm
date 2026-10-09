@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: ball_tier_01
   m_EditorClassIdentifier: 
   tier: 1
-  damage: 10
+  damage: 50
   hp: 1
   mergePts: 20
