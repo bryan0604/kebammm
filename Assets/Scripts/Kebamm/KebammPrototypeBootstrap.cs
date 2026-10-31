@@ -8,9 +8,10 @@ namespace Kebamm
      * Kebamm minimal Suika-style prototype
      * ------------------------------------
      * CAPACITY RELEASE RULE:
-     *   Any ball whose collider remains overlapping the capacity trigger for 1.0
-     *   continuous seconds WHILE settled (Rigidbody2D.linearVelocity magnitude
-     *   <= 0.15) opens the container floor/gate. Balls then fall with gravity
+     *   Polled every FixedUpdate with ONE shared timer: while at least one settled
+     *   ball (speed <= 0.15 or sleeping, not preview/merging) is touching or above
+     *   the cap band for 1.0 continuous seconds, the container floor/gate opens.
+     *   Any moving or merging ball over the line, or none settled there, resets it. Balls then fall with gravity
      *   onto the monsters below and apply damage = (tier + 1) * 5.
      *   That floor open is the bombing run. It is not a separate trigger.
      *
@@ -407,6 +408,7 @@ namespace Kebamm
             var rb = ball.GetComponent<Rigidbody2D>();
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
+            _capacity?.NotifyMerge(ball);
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
             KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
         }

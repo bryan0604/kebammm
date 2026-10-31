@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Kebamm
@@ -21,6 +22,22 @@ namespace Kebamm
         CircleCollider2D _col;
         SpriteRenderer _sr;
 
+        /// <summary>Live (non-preview) balls, kept for allocation-free polling (KebammCapacityMonitor).</summary>
+        public static readonly List<KebammBall> Live = new List<KebammBall>();
+        bool _registered;
+
+        public Rigidbody2D Body => _rb;
+        public Collider2D Col => _col;
+        /// <summary>Set by KebammCapacityMonitor once this ball first comes to rest after spawning.</summary>
+        public bool HasSettled { get; set; }
+
+        void OnDestroy()
+        {
+            if (_registered)
+                Live.Remove(this);
+            _registered = false;
+        }
+
         public float Radius => 0.28f + Tier * 0.14f;
 
         public void Configure(KebammBallColour colour, int tier, bool preview)
@@ -37,6 +54,11 @@ namespace Kebamm
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<CircleCollider2D>();
             _sr = GetComponent<SpriteRenderer>();
+            if (!preview && !_registered)
+            {
+                Live.Add(this);
+                _registered = true;
+            }
 
             float radius = Radius;
             transform.localScale = Vector3.one * (radius * 2f);
