@@ -16,4 +16,4 @@ MonoBehaviour:
   damage: 100
   hp: 1
   mergePts: 40
-  impactStrength: 3
+  impactStrength: 5
