@@ -75,6 +75,10 @@ namespace Kebamm
 
         public bool InMainMenu => _mainMenu != null && _mainMenu.IsVisible;
 
+        /// <summary>True while the dev console is open; ball drops and the R reset ignore input.</summary>
+        public static bool GameplayInputBlocked { get; set; }
+        public int CurrentLevelIndex => _levelIndex;
+
         public int CurrentLevelNumber => LevelNumberAt(_levelIndex);
         public bool HasNextLevel => _levelIndex + 1 < _activeLevels.Count;
         public int NextLevelNumber => HasNextLevel ? LevelNumberAt(_levelIndex + 1) : CurrentLevelNumber;
@@ -113,6 +117,7 @@ namespace Kebamm
         void Awake()
         {
             Instance = this;
+            GameplayInputBlocked = false;
             EnsurePhysicsMaterial();
             LoadLevels();
             BuildWorld();
@@ -130,7 +135,7 @@ namespace Kebamm
                 return;
 
             var kb = UnityEngine.InputSystem.Keyboard.current;
-            if (kb != null && kb.rKey.wasPressedThisFrame)
+            if (!GameplayInputBlocked && kb != null && kb.rKey.wasPressedThisFrame)
                 ResetSession();
 
             TickBombingRunIdle();
@@ -206,6 +211,12 @@ namespace Kebamm
             _mainMenu = menuGo.AddComponent<KebammMainMenu>();
             _mainMenu.Build();
             ShowMainMenu();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            var consoleGo = new GameObject("DebugConsole");
+            consoleGo.transform.SetParent(transform, false);
+            consoleGo.AddComponent<KebammDebugConsole>().Build();
+#endif
 
             Debug.Log("[Kebamm] Prototype ready. Press START, then aim with mouse, drop with LMB/Space, reset with R.");
         }
@@ -471,6 +482,49 @@ namespace Kebamm
             Debug.Log($"[Kebamm] Current level: {CurrentLevelNumber} (entry {_levelIndex + 1}/{Mathf.Max(1, _activeLevels.Count)})");
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.RefreshLevel();
+        }
+
+        /// <summary>Active level numbers, e.g. "1, 2, 3".</summary>
+        public string LevelNumbersText
+        {
+            get
+            {
+                if (_activeLevels.Count == 0)
+                    return "1";
+                var numbers = new List<string>();
+                for (int i = 0; i < _activeLevels.Count; i++)
+                    numbers.Add(LevelNumberAt(i).ToString());
+                return string.Join(", ", numbers);
+            }
+        }
+
+        /// <summary>Index in the active level list for a level number.</summary>
+        public bool TryGetLevelIndex(int levelNumber, out int index)
+        {
+            for (int i = 0; i < _activeLevels.Count; i++)
+            {
+                if (_activeLevels[i] != null && _activeLevels[i].levelNumber == levelNumber)
+                {
+                    index = i;
+                    return true;
+                }
+            }
+            index = 0;
+            return _activeLevels.Count == 0 && levelNumber == 1;
+        }
+
+        /// <summary>Starts the level at index right away (from the menu or mid-game): fresh monsters, score and state.</summary>
+        public void JumpToLevelIndex(int index)
+        {
+            if (_activeLevels.Count > 0)
+                _levelIndex = Mathf.Clamp(index, 0, _activeLevels.Count - 1);
+            Debug.Log($"[Kebamm] Jump to level {CurrentLevelNumber} (entry {_levelIndex + 1}/{Mathf.Max(1, _activeLevels.Count)})");
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.RefreshLevel();
+            if (InMainMenu)
+                StartGameFromMenu();
+            else
+                ResetSession();
         }
 
         public void ShowMainMenu()

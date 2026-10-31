@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 namespace Kebamm
@@ -45,7 +45,7 @@ namespace Kebamm
             if (_preview != null && _preview.gameObject.activeSelf != allowDrop)
                 _preview.gameObject.SetActive(allowDrop);
 
-            if (!allowDrop)
+            if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked)
                 return;
 
             UpdateAim();
