@@ -430,6 +430,13 @@ namespace Kebamm
 
         void OnStart()
         {
+            // Door transition: close, swap menu -> level while covered, then open.
+            // Play() returns false (and ignores the press) if one is already running.
+            KebammDoorTransition.Play(StartLevelNow);
+        }
+
+        void StartLevelNow()
+        {
             if (KebammPrototypeBootstrap.Instance != null)
                 KebammPrototypeBootstrap.Instance.StartGameFromMenu();
             else
