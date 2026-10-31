@@ -433,8 +433,9 @@ namespace Kebamm
         {
             if (KebammPrototypeBootstrap.Instance != null)
             {
-                KebammPrototypeBootstrap.Instance.ResetSession();
                 KebammPrototypeBootstrap.Instance.AdvanceLevel();
+                // Advance first so ResetSession respawns monsters for the new level.
+                KebammPrototypeBootstrap.Instance.ResetSession();
             }
         }
 

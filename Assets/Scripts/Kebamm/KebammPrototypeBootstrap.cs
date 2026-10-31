@@ -212,7 +212,13 @@ namespace Kebamm
 
         void SpawnMonsters()
         {
+            for (int i = 0; i < _monsters.Count; i++)
+            {
+                if (_monsters[i] != null)
+                    Destroy(_monsters[i].gameObject);
+            }
             _monsters.Clear();
+            KebammLevel level = CurrentLevel;
 
             KebammGameData gameData = Resources.Load<KebammGameData>("Kebamm/GameData");
             if (gameData == null)
@@ -237,7 +243,23 @@ namespace Kebamm
 
             System.Array.Sort(monsterDatas, (a, b) => a.id.CompareTo(b.id));
 
-            int spawnCount = levelData.SpawnCountAtStart();
+            // Monster tier range: the level's prepopulateMonsterTierMin/Max filters
+            // monster data tiers (monster_01_basic_tier_01..03). Falls back to all monsters.
+            if (level != null)
+            {
+                var inRange = System.Array.FindAll(monsterDatas, m => m != null &&
+                    m.tier >= level.prepopulateMonsterTierMin && m.tier <= level.prepopulateMonsterTierMax);
+                if (inRange.Length > 0)
+                    monsterDatas = inRange;
+                else
+                    Debug.LogWarning($"[Kebamm] Level {level.levelNumber}: no monster data with tier {level.prepopulateMonsterTierMin}-{level.prepopulateMonsterTierMax}; using all monsters.");
+            }
+
+            // Count from the current level; global LevelData.asset only when there is no active level.
+            int spawnCount = level != null
+                ? Mathf.Max(0, level.levelPrepopulate ? level.prepopulateMonsterNumber : level.monsterQty)
+                : levelData.SpawnCountAtStart();
+            Debug.Log($"[Kebamm] Level {CurrentLevelNumber}: spawning {spawnCount} monsters, colours [{string.Join(", ", CurrentColourPool())}]");
             float groundTop = (MonsterY - 1f) + GroundThickness * 0.5f;
             float halfPlatform = GroundWidth * 0.5f;
 
@@ -248,7 +270,7 @@ namespace Kebamm
                 if (size < 0.05f)
                     size = 0.05f;
 
-                KebammBallColour colour = ColourPool[Random.Range(0, ColourPool.Length)];
+                KebammBallColour colour = RandomLevelColour();
                 float reach = halfPlatform - size * 0.5f - SpawnInset;
                 if (reach < 0f)
                     reach = 0f;
@@ -273,8 +295,17 @@ namespace Kebamm
             mSr.sortingOrder = 1;
             monsterGo.AddComponent<BoxCollider2D>();
             var mRb = monsterGo.AddComponent<Rigidbody2D>();
-            mRb.bodyType = RigidbodyType2D.Kinematic;
+            // Dynamic so ball impacts can knock monsters around (see KebammMonster.ApplyImpact).
+            mRb.bodyType = RigidbodyType2D.Dynamic;
             mRb.simulated = true;
+            mRb.gravityScale = 1.4f;
+            mRb.mass = 2f;
+            mRb.linearDamping = 0.2f;
+            mRb.angularDamping = 3f;
+            mRb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            mRb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            mRb.sharedMaterial = KebammMonster.SharedMaterial;
+            monsterGo.GetComponent<BoxCollider2D>().sharedMaterial = KebammMonster.SharedMaterial;
             var monster = monsterGo.AddComponent<KebammMonster>();
             float hp = data != null ? data.hp : 100f;
             int hitPts;
@@ -284,6 +315,8 @@ namespace Kebamm
             else
                 KebammMonsterData.FallbackPoints(1, out hitPts, out destroyedPts);
             monster.Init(hp, colour, hitPts, destroyedPts);
+            float edge = Mathf.Max(0f, GroundWidth * 0.5f - size * 0.5f);
+            monster.SetBounds(-edge, edge);
             if (data != null && !string.IsNullOrEmpty(data.name))
                 monsterGo.name = data.name;
             return monster;
@@ -321,7 +354,25 @@ namespace Kebamm
 
         public KebammBallColour NextQueuedColour()
         {
-            return ColourPool[Random.Range(0, ColourPool.Length)];
+            return RandomLevelColour();
+        }
+
+        KebammLevel CurrentLevel =>
+            _levelIndex >= 0 && _levelIndex < _activeLevels.Count ? _activeLevels[_levelIndex] : null;
+
+        /// <summary>The level's prepopulateBallColours, or the full ColourPool if none are set.</summary>
+        KebammBallColour[] CurrentColourPool()
+        {
+            KebammLevel level = CurrentLevel;
+            if (level != null && level.prepopulateBallColours != null && level.prepopulateBallColours.Count > 0)
+                return level.prepopulateBallColours.ToArray();
+            return ColourPool;
+        }
+
+        KebammBallColour RandomLevelColour()
+        {
+            KebammBallColour[] pool = CurrentColourPool();
+            return pool[Random.Range(0, pool.Length)];
         }
 
         public KebammBall SpawnBall(Vector3 position, KebammBallColour colour, int tier, bool preview)
@@ -456,11 +507,8 @@ namespace Kebamm
 
             _capacity?.ResetTimers();
             _container?.CloseFloor();
-            for (int i = 0; i < _monsters.Count; i++)
-            {
-                if (_monsters[i] != null)
-                    _monsters[i].ResetHealth();
-            }
+            // Respawn so count, colours and tiers follow the current level.
+            SpawnMonsters();
 
             _dropper?.ClearPreview();
             _dropper?.SetDroppingEnabled(true);

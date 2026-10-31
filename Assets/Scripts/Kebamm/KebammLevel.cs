@@ -1,13 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Kebamm
 {
     [CreateAssetMenu(fileName = "Level", menuName = "Kebamm/Level")]
     public class KebammLevel : ScriptableObject
     {
-        public const int MinBallTier = 1;
-        public const int MaxBallTier = 5;
+        public const int MinMonsterTier = 1;
+        public const int MaxMonsterTier = 5;
 
         [Header("Level Information")]
         public int levelNumber = 1;
@@ -21,8 +22,8 @@ namespace Kebamm
             KebammBallColour.Red,
             KebammBallColour.Blue
         };
-        [Range(MinBallTier, MaxBallTier)] public int prepopulateBallTierMin = 1;
-        [Range(MinBallTier, MaxBallTier)] public int prepopulateBallTierMax = 2;
+        [Tooltip("Lowest monster data tier spawned in this level.")][FormerlySerializedAs("prepopulateBallTierMin")][Range(MinMonsterTier, MaxMonsterTier)] public int prepopulateMonsterTierMin = 1;
+        [Tooltip("Highest monster data tier spawned in this level.")][FormerlySerializedAs("prepopulateBallTierMax")][Range(MinMonsterTier, MaxMonsterTier)] public int prepopulateMonsterTierMax = 2;
         public int prepopulateObstacleQty;
         [Tooltip("x = min, y = max")] public Vector2 prepopulateMonsterPositionRangeX = new Vector2(-2f, 2f);
         [Tooltip("x = min, y = max")] public Vector2 prepopulateMonsterPositionRangeY = new Vector2(0f, 1f);
@@ -40,10 +41,10 @@ namespace Kebamm
             if (prepopulateObstacleQty < 0)
                 prepopulateObstacleQty = 0;
 
-            prepopulateBallTierMin = Mathf.Clamp(prepopulateBallTierMin, MinBallTier, MaxBallTier);
-            prepopulateBallTierMax = Mathf.Clamp(prepopulateBallTierMax, MinBallTier, MaxBallTier);
-            if (prepopulateBallTierMax < prepopulateBallTierMin)
-                prepopulateBallTierMax = prepopulateBallTierMin;
+            prepopulateMonsterTierMin = Mathf.Clamp(prepopulateMonsterTierMin, MinMonsterTier, MaxMonsterTier);
+            prepopulateMonsterTierMax = Mathf.Clamp(prepopulateMonsterTierMax, MinMonsterTier, MaxMonsterTier);
+            if (prepopulateMonsterTierMax < prepopulateMonsterTierMin)
+                prepopulateMonsterTierMax = prepopulateMonsterTierMin;
 
             ClampRange(ref prepopulateMonsterPositionRangeX);
             ClampRange(ref prepopulateMonsterPositionRangeY);

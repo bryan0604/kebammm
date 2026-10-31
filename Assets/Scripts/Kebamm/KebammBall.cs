@@ -15,6 +15,7 @@ namespace Kebamm
         public bool IsPreview { get; private set; }
         public float Damage { get; private set; }
         public float Health { get; private set; }
+        public float ImpactStrength { get; private set; }
 
         Rigidbody2D _rb;
         CircleCollider2D _col;
@@ -31,6 +32,7 @@ namespace Kebamm
             KebammBallTierData.Resolve(Tier, out float damage, out float hp);
             Damage = damage;
             Health = hp;
+            ImpactStrength = KebammBallTierData.ImpactStrengthForPlayTier(Tier);
 
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<CircleCollider2D>();

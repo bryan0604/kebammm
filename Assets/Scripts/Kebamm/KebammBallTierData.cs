@@ -10,6 +10,8 @@ namespace Kebamm
         public float damage;
         public float hp = 1f;
         public int mergePts;
+        [Tooltip("Launch speed (units/s) given to a monster hit by this tier: up + away from the impact side.")]
+        public float impactStrength = 3f;
 
         static Dictionary<int, KebammBallTierData> _byTier;
 
@@ -39,6 +41,15 @@ namespace Kebamm
             damage = dataTier * 10f;
             hp = 1f;
             mergePts = DefaultMergePts(dataTier);
+        }
+
+        public static float ImpactStrengthForPlayTier(int playTier)
+        {
+            int dataTier = Mathf.Clamp(playTier + 1, 1, 5);
+            Ensure();
+            if (_byTier != null && _byTier.TryGetValue(dataTier, out KebammBallTierData row) && row != null && row.impactStrength > 0f)
+                return row.impactStrength;
+            return 2f + dataTier * 0.5f;
         }
 
         public static int DefaultMergePts(int dataTier)

@@ -21,8 +21,8 @@ MonoBehaviour:
   - 1
   - 2
   - 3
-  prepopulateBallTierMin: 1
-  prepopulateBallTierMax: 4
+  prepopulateMonsterTierMin: 1
+  prepopulateMonsterTierMax: 4
   prepopulateObstacleQty: 0
   prepopulateMonsterPositionRangeX: {x: -3.5, y: 3.5}
   prepopulateMonsterPositionRangeY: {x: 0, y: 2.5}
