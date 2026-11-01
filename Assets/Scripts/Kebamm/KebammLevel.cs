@@ -16,7 +16,8 @@ namespace Kebamm
 
         [Header("Prepopulate")]
         public bool levelPrepopulate = true;
-        public int prepopulateMonsterNumber = 3;
+        // Unused: monster count comes from monsterQty only. Kept so existing assets still load.
+        [Tooltip("Unused - monster count comes from Monster Qty.")] public int prepopulateMonsterNumber = 3;
         public List<KebammBallColour> prepopulateBallColours = new List<KebammBallColour>
         {
             KebammBallColour.Red,
@@ -29,6 +30,7 @@ namespace Kebamm
         [Tooltip("x = min, y = max")] public Vector2 prepopulateMonsterPositionRangeY = new Vector2(0f, 1f);
         [Tooltip("x = min, y = max")] public Vector2 prepopulateObstaclePositionRangeX = new Vector2(-2f, 2f);
         [Tooltip("x = min, y = max")] public Vector2 prepopulateObstaclePositionRangeY = new Vector2(0f, 1f);
+        [Tooltip("Chance (0-1) each prepopulated monster after the first stacks on a random existing stack.")][Range(0f, 1f)] public float monsterStackChance;
 
         void OnValidate()
         {

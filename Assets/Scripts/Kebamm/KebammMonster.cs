@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Kebamm
@@ -31,6 +32,12 @@ namespace Kebamm
         float _maxX = 1000f;
         float _restTimer;
 
+        // Monsters hold in place (no gravity, frozen) until the first ball hit, and never collide with each other.
+        static readonly List<Collider2D> LiveColliders = new List<Collider2D>();
+        Collider2D _col;
+        float _activeGravity = 1.4f;
+        bool _activated;
+
         static PhysicsMaterial2D _sharedMaterial;
         public static PhysicsMaterial2D SharedMaterial
         {
@@ -58,6 +65,8 @@ namespace Kebamm
             colour = ballColour;
             _sr = GetComponent<SpriteRenderer>();
             _rb = GetComponent<Rigidbody2D>();
+            HoldUntilHit();
+            IgnoreOtherMonsters();
             ApplyLook();
             name = "Monster";
         }
@@ -89,9 +98,49 @@ namespace Kebamm
             _maxX = Mathf.Max(minX, maxX);
         }
 
+        void HoldUntilHit()
+        {
+            _activated = false;
+            if (_rb == null)
+                return;
+            if (_rb.gravityScale > 0f)
+                _activeGravity = _rb.gravityScale;
+            _rb.gravityScale = 0f;
+            _rb.linearVelocity = Vector2.zero;
+            _rb.angularVelocity = 0f;
+            _rb.constraints = RigidbodyConstraints2D.FreezeAll;
+        }
+
+        void Activate()
+        {
+            if (_activated || _rb == null)
+                return;
+            _activated = true;
+            _rb.constraints = RigidbodyConstraints2D.None;
+            _rb.gravityScale = _activeGravity;
+        }
+
+        void IgnoreOtherMonsters()
+        {
+            if (_col == null)
+                _col = GetComponent<Collider2D>();
+            LiveColliders.RemoveAll(c => c == null);
+            foreach (var other in LiveColliders)
+                if (other != _col)
+                    Physics2D.IgnoreCollision(_col, other, true);
+            if (!LiveColliders.Contains(_col))
+                LiveColliders.Add(_col);
+        }
+
+        void OnDestroy()
+        {
+            if (_col != null)
+                LiveColliders.Remove(_col);
+        }
+
         void ApplyImpact(KebammBall ball, Collision2D collision)
         {
-            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
+            Activate();            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
                 return;
 
             float hitX = collision.contactCount > 0 ? collision.GetContact(0).point.x : ball.transform.position.x;
@@ -111,7 +160,7 @@ namespace Kebamm
 
         void FixedUpdate()
         {
-            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
+            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic || !_activated)
                 return;
 
             // Keep inside the platform edges.

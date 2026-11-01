@@ -51,8 +51,10 @@ namespace Kebamm
         public static PhysicsMaterial2D SharedPhysicsMaterial { get; private set; }
 
         [Header("Layout")]
-        public float ContainerWidth = 3.2f;
-        public float ContainerHeight = 5.2f;
+        public float ContainerWidth = 5.0f;
+        public float ContainerHeight = 5.8f;
+        // Inner floor top (world y). The container grows upward from here as height changes.
+        public float ContainerFloorY = -2.5f;
         public float WallThickness = 0.25f;
         public float CapacityFromTop = 0.85f;
         public float MonsterY = -5.2f;
@@ -153,6 +155,42 @@ namespace Kebamm
             };
         }
 
+        const string BackgroundPath = "Kebamm/Environment/bg_zone1";
+        // Pixel row (from the top of the 1125x2000 image) where the Zone 1 grass surface begins.
+        const float BackgroundGroundRow = 1846f;
+
+        // Cover-scales the background behind everything, anchoring its painted ground to groundTop.
+        // Returns false (camera background colour stays) when the sprite is missing.
+        bool BuildBackground(Camera cam, float groundTop)
+        {
+            if (cam == null) return false;
+            var sprite = Resources.Load<Sprite>(BackgroundPath);
+            if (sprite == null) return false;
+
+            float viewH = cam.orthographicSize * 2f;
+            float viewW = viewH * cam.aspect;
+            Vector2 size = sprite.bounds.size;
+            float groundFromTop = BackgroundGroundRow / sprite.pixelsPerUnit;
+            float below = size.y - groundFromTop;
+            float camY = cam.transform.position.y;
+            float viewTop = camY + viewH * 0.5f;
+            float viewBottom = camY - viewH * 0.5f;
+
+            float s = Mathf.Max(viewW / size.x, viewH / size.y);
+            s = Mathf.Max(s, (viewTop - groundTop) / groundFromTop);
+            if (below > 0f) s = Mathf.Max(s, (groundTop - viewBottom) / below);
+
+            var go = new GameObject("Background");
+            go.transform.SetParent(_worldRoot, false);
+            float centerY = groundTop + (groundFromTop - size.y * 0.5f) * s;
+            go.transform.position = new Vector3(cam.transform.position.x, centerY, 0f);
+            go.transform.localScale = new Vector3(s, s, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sortingOrder = -100;
+            return true;
+        }
+
         void BuildWorld()
         {
             var cam = Camera.main;
@@ -169,7 +207,7 @@ namespace Kebamm
 
             var containerGo = new GameObject("Container");
             containerGo.transform.SetParent(_worldRoot, false);
-            containerGo.transform.position = new Vector3(0f, 0.4f, 0f);
+            containerGo.transform.position = new Vector3(0f, ContainerFloorY + ContainerHeight * 0.5f, 0f);
             _container = containerGo.AddComponent<KebammContainer>();
             _container.Build(ContainerWidth, ContainerHeight, WallThickness, CapacityFromTop);
 
@@ -193,6 +231,9 @@ namespace Kebamm
             gSr.sortingOrder = 0;
             groundGo.transform.localScale = new Vector3(GroundWidth, GroundThickness, 1f);
             groundGo.AddComponent<BoxCollider2D>();
+            // Background art draws its own grass; keep the collider, hide the flat ground strip.
+            if (BuildBackground(cam, (MonsterY - 1f) + GroundThickness * 0.5f))
+                gSr.enabled = false;
 
             SpawnMonsters();
 
@@ -269,11 +310,16 @@ namespace Kebamm
 
             // Count from the current level; global LevelData.asset only when there is no active level.
             int spawnCount = level != null
-                ? Mathf.Max(0, level.levelPrepopulate ? level.prepopulateMonsterNumber : level.monsterQty)
+                ? Mathf.Max(0, level.monsterQty)
                 : levelData.SpawnCountAtStart();
             Debug.Log($"[Kebamm] Level {CurrentLevelNumber}: spawning {spawnCount} monsters, colours [{string.Join(", ", CurrentColourPool())}]");
             float groundTop = (MonsterY - 1f) + GroundThickness * 0.5f;
             float halfPlatform = GroundWidth * 0.5f;
+            float stackChance = level != null ? level.monsterStackChance : 0f;
+            // Stacks may not reach the base underside (container floor minus its thickness).
+            float stackCeiling = ContainerFloorY - WallThickness - 0.05f;
+            var stacks = new List<List<KebammMonster>>();
+            var openStacks = new List<List<KebammMonster>>();
 
             for (int i = 0; i < spawnCount; i++)
             {
@@ -286,14 +332,94 @@ namespace Kebamm
                 float reach = halfPlatform - size * 0.5f - SpawnInset;
                 if (reach < 0f)
                     reach = 0f;
+                // Ground spawns avoid existing stacks' footprints so physics never pushes a stack sideways at spawn.
                 float x = Random.Range(-reach, reach);
+                for (int attempt = 0; attempt < 12 && OverlapsStack(stacks, x, size); attempt++)
+                    x = Random.Range(-reach, reach);
                 // Square sprite pivot is center, so lift by half the uniform scale to rest on the ground.
                 float y = groundTop + size * 0.5f;
 
+                // Stacking: first monster never rolls. Pick random non-full stacks until one fits.
+                List<KebammMonster> target = null;
+                float bottomX = 0f;
+                if (stacks.Count > 0 && Random.value < stackChance)
+                {
+                    openStacks.Clear();
+                    for (int s = 0; s < stacks.Count; s++)
+                        if (stacks[s].Count < MaxMonsterStack)
+                            openStacks.Add(stacks[s]);
+                    while (openStacks.Count > 0 && target == null)
+                    {
+                        int pick = Random.Range(0, openStacks.Count);
+                        var candidate = openStacks[pick];
+                        KebammMonster top = candidate[candidate.Count - 1];
+                        float topY = MonsterTopY(top);
+                        float candidateY = topY + StackGap + size * 0.5f;
+                        // Must also sit inside this monster's own edge bounds, or the edge clamp would shift its X.
+                        float stackX = MonsterCenterX(candidate[0]);
+                        if (candidateY + size * 0.5f <= stackCeiling && Mathf.Abs(stackX) <= halfPlatform - size * 0.5f)
+                        {
+                            target = candidate;
+                            // Same X as the bottom monster's collider centre (new monster's collider offset is 0); only Y rises.
+                            bottomX = stackX;
+                            x = bottomX;
+                            y = candidateY;
+                        }
+                        openStacks.RemoveAt(pick);
+                    }
+                }
+
                 KebammMonster monster = SpawnMonster(data, size, colour, new Vector3(x, y, 0f));
                 _monsters.Add(monster);
-                Debug.Log($"[Kebamm] Spawned {monster.name} tier={data.tier} hp={data.hp} colour={colour} size={size} x={x:0.00}");
+                if (target != null)
+                {
+                    target.Add(monster);
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                    Debug.Log($"[Kebamm] Stack x check: bottom={bottomX:0.000} new={MonsterCenterX(monster):0.000}");
+#endif
+                }
+                else
+                    stacks.Add(new List<KebammMonster> { monster });
+                Debug.Log($"[Kebamm] Spawned {monster.name} tier={data.tier} hp={data.hp} colour={colour} size={size} x={x:0.00} y={y:0.00} stack={(target != null ? target.Count : 1)}");
             }
+        }
+
+        const int MaxMonsterStack = 5;
+        const float StackGap = 0.01f;
+
+        static float MonsterCenterX(KebammMonster m)
+        {
+            var col = m.GetComponent<BoxCollider2D>();
+            return col != null ? m.transform.TransformPoint(col.offset).x : m.transform.position.x;
+        }
+
+        static float MonsterWidth(KebammMonster m)
+        {
+            var col = m.GetComponent<BoxCollider2D>();
+            return (col != null ? col.size.x : 1f) * Mathf.Abs(m.transform.lossyScale.x);
+        }
+
+        static bool OverlapsStack(List<List<KebammMonster>> stacks, float x, float size)
+        {
+            for (int s = 0; s < stacks.Count; s++)
+            {
+                float w = 0f;
+                for (int k = 0; k < stacks[s].Count; k++)
+                    w = Mathf.Max(w, MonsterWidth(stacks[s][k]));
+                if (Mathf.Abs(x - MonsterCenterX(stacks[s][0])) < (w + size) * 0.5f + 0.02f)
+                    return true;
+            }
+            return false;
+        }
+
+        // Top edge from the BoxCollider2D (size/offset in local space), valid before physics syncs.
+        static float MonsterTopY(KebammMonster m)
+        {
+            Transform t = m.transform;
+            var col = m.GetComponent<BoxCollider2D>();
+            if (col == null)
+                return t.position.y + t.lossyScale.y * 0.5f;
+            return t.position.y + (col.offset.y + col.size.y * 0.5f) * t.lossyScale.y;
         }
 
         KebammMonster SpawnMonster(KebammMonsterData data, float size, KebammBallColour colour, Vector3 position)

@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: level_03
   m_EditorClassIdentifier:
   levelNumber: 3
-  monsterQty: 5
+  monsterQty: 6
   levelPrepopulate: 1
   prepopulateMonsterNumber: 5
   prepopulateBallColours:
@@ -27,3 +27,4 @@ MonoBehaviour:
   prepopulateMonsterPositionRangeY: {x: 0, y: 1.5}
   prepopulateObstaclePositionRangeX: {x: -2.5, y: 2.5}
   prepopulateObstaclePositionRangeY: {x: 0, y: 1.5}
+  monsterStackChance: 0.8
