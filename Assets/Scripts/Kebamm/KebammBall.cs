@@ -63,8 +63,10 @@ namespace Kebamm
             float radius = Radius;
             transform.localScale = Vector3.one * (radius * 2f);
             _col.radius = 0.5f;
-            _sr.sprite = KebammVisualFactory.CircleSprite;
-            _sr.color = KebammVisualFactory.ColourFor(colour);
+            // Ball art (untinted) when present; otherwise the tinted placeholder circle.
+            Sprite art = ArtFor(colour, Tier);
+            _sr.sprite = art != null ? art : KebammVisualFactory.CircleSprite;
+            _sr.color = art != null ? Color.white : KebammVisualFactory.ColourFor(colour);
             _sr.sortingOrder = 10 + Tier;
 
             if (preview)
@@ -89,6 +91,27 @@ namespace Kebamm
             name = $"Ball_{colour}_T{Tier}";
         }
 
+
+        // Resources/Kebamm/Balls/ball_<colour>_t<tier> overrides per tier; ball_<colour> is used for every tier.
+        // Art is a square, edge-to-edge circle imported at PPU = pixel width, so it is 1 unit wide like the placeholder.
+        const string ArtFolder = "Kebamm/Balls/ball_";
+        static readonly Dictionary<string, Sprite> ArtCache = new Dictionary<string, Sprite>();
+
+        static Sprite ArtFor(KebammBallColour colour, int tier)
+        {
+            string c = colour.ToString().ToLowerInvariant();
+            return LoadArt($"{c}_t{tier}") ?? LoadArt(c);
+        }
+
+        static Sprite LoadArt(string key)
+        {
+            if (!ArtCache.TryGetValue(key, out Sprite s))
+            {
+                s = Resources.Load<Sprite>(ArtFolder + key);
+                ArtCache[key] = s;
+            }
+            return s != null ? s : null;
+        }
 
         public bool TakeDamage(float amount)
         {
