@@ -13,6 +13,7 @@ namespace Kebamm
         const float Duration = 0.7f;
 
         static TMP_FontAsset _font;
+        static bool _fontTried;
 
         public static void Spawn(Bounds spriteBounds, float amount)
         {
@@ -59,8 +60,12 @@ namespace Kebamm
 
         static TMP_FontAsset GetFont()
         {
-            if (_font != null)
+            // Only try once: CreateFontAsset fails on this setup ("Unable to load font face for [LegacyRuntime]")
+            // and returns null, so without this flag it was retried (and warned, with a stack trace) on every call.
+            if (_font != null || _fontTried)
                 return _font;
+            _fontTried = true;
+            KebammFrameSpikeLog.FontLoads++;
 
             Font builtin = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (builtin == null)

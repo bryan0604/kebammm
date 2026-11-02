@@ -47,6 +47,7 @@ namespace Kebamm
         public bool IsVisible => _root != null && _root.activeSelf;
 
         static TMP_FontAsset _font;
+        static bool _fontTried;
 
         static readonly Color BackgroundTop = new Color(0.78f, 0.24f, 0.71f);
         static readonly Color Pedestal = new Color(0.56f, 0.27f, 0.86f);
@@ -583,8 +584,12 @@ namespace Kebamm
 
         static TMP_FontAsset GetFont()
         {
-            if (_font != null)
+            // Only try once: CreateFontAsset fails on this setup ("Unable to load font face for [LegacyRuntime]")
+            // and returns null, so without this flag it was retried (and warned, with a stack trace) on every call.
+            if (_font != null || _fontTried)
                 return _font;
+            _fontTried = true;
+            KebammFrameSpikeLog.FontLoads++;
 
             Font builtin = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (builtin == null)
