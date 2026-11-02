@@ -40,6 +40,15 @@ namespace Kebamm
 
         public float Radius => 0.28f + Tier * 0.14f;
 
+        // Merge: the merged ball appears at the midpoint of the two balls and grows from the pre-merge size
+        // to the new tier size, so physics pushes neighbours aside gradually.
+        public const float MergeGrowDuration = 0.25f;  // seconds to grow to full size
+        public const float MergePushMaxSpeed = 3f;     // neighbour speed cap while a merged ball grows (units/s)
+
+        float _growFrom, _growTo, _growStart;
+        bool _growing;
+        static readonly Collider2D[] GrowHits = new Collider2D[16];
+
         public void Configure(KebammBallColour colour, int tier, bool preview)
         {
             Colour = colour;
@@ -113,6 +122,56 @@ namespace Kebamm
             return s != null ? s : null;
         }
 
+        /// <summary>Start at startDiameter and grow to this tier's size over MergeGrowDuration.</summary>
+        public void BeginGrow(float startDiameter)
+        {
+            _growTo = Radius * 2f;
+            _growFrom = Mathf.Clamp(startDiameter, 0.01f, _growTo);
+            _growStart = Time.time;
+            _growing = true;
+            transform.localScale = Vector3.one * _growFrom;
+            if (_rb != null)
+            {
+                _rb.linearVelocity = Vector2.zero;
+                _rb.angularVelocity = 0f;
+            }
+        }
+
+        // Scale is driven every rendered frame (not only at 50 Hz physics steps) with an ease-out cubic,
+        // so the grow looks smooth; the collider follows the transform on the next physics step.
+        void Update()
+        {
+            if (!_growing || IsPreview)
+                return;
+            float t = Mathf.Clamp01((Time.time - _growStart) / MergeGrowDuration);
+            float e = 1f - (1f - t) * (1f - t) * (1f - t); // ease-out cubic
+            transform.localScale = Vector3.one * Mathf.Lerp(_growFrom, _growTo, e);
+            if (t >= 1f)
+                _growing = false;
+        }
+
+        void FixedUpdate()
+        {
+            if (!_growing || IsPreview)
+                return;
+
+            // Keep the push gentle: cap this ball's and nearby balls' speed while growing.
+            CapSpeed(_rb);
+            int n = Physics2D.OverlapCircleNonAlloc(transform.position, _growTo * 0.5f + 0.1f, GrowHits);
+            for (int i = 0; i < n; i++)
+            {
+                var other = GrowHits[i] != null ? GrowHits[i].GetComponent<KebammBall>() : null;
+                if (other != null && other != this)
+                    CapSpeed(other._rb);
+            }
+        }
+
+        static void CapSpeed(Rigidbody2D rb)
+        {
+            if (rb != null && rb.linearVelocity.sqrMagnitude > MergePushMaxSpeed * MergePushMaxSpeed)
+                rb.linearVelocity = rb.linearVelocity.normalized * MergePushMaxSpeed;
+        }
+
         public bool TakeDamage(float amount)
         {
             Health = Mathf.Max(0f, Health - amount);
@@ -146,6 +205,7 @@ namespace Kebamm
             other.BeginMerge();
 
             Vector3 mid = (transform.position + other.transform.position) * 0.5f;
+            float startDiameter = Mathf.Max(transform.localScale.x, other.transform.localScale.x);
             int nextTier = Tier + 1;
             var colour = Colour;
 
@@ -153,7 +213,7 @@ namespace Kebamm
             Destroy(gameObject);
 
             if (KebammPrototypeBootstrap.Instance != null)
-                KebammPrototypeBootstrap.Instance.SpawnMergedBall(mid, colour, nextTier);
+                KebammPrototypeBootstrap.Instance.SpawnMergedBall(mid, colour, nextTier, startDiameter);
         }
     }
 }

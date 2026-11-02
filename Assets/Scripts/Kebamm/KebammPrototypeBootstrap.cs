@@ -528,9 +528,11 @@ namespace Kebamm
             return ball;
         }
 
-        public void SpawnMergedBall(Vector3 position, KebammBallColour colour, int tier)
+        public void SpawnMergedBall(Vector3 position, KebammBallColour colour, int tier, float startDiameter = -1f)
         {
             var ball = SpawnBall(position, colour, tier, preview: false);
+            if (ball != null && startDiameter > 0f)
+                ball.BeginGrow(startDiameter);
             var rb = ball.GetComponent<Rigidbody2D>();
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
