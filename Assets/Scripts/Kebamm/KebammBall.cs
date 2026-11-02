@@ -112,6 +112,19 @@ namespace Kebamm
             return LoadArt($"{c}_t{tier}") ?? LoadArt(c);
         }
 
+        /// <summary>
+        /// Loads (and caches) every colour/tier art lookup up front, so the first drop or merge of a new
+        /// colour/tier does not hit Resources.Load and a texture upload mid-play (a frame hitch on placing a ball).
+        /// </summary>
+        public static void PrewarmArt()
+        {
+            foreach (KebammBallColour colour in System.Enum.GetValues(typeof(KebammBallColour)))
+            {
+                for (int tier = 0; tier <= MaxTier; tier++)
+                    ArtFor(colour, tier);
+            }
+        }
+
         static Sprite LoadArt(string key)
         {
             if (!ArtCache.TryGetValue(key, out Sprite s))

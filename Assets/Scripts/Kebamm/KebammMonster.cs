@@ -33,7 +33,7 @@ namespace Kebamm
         float _restTimer;
 
         // Monsters hold in place (no gravity, frozen) until the first ball hit, and never collide with each other.
-        static readonly List<Collider2D> LiveColliders = new List<Collider2D>();
+        internal static readonly List<Collider2D> LiveColliders = new List<Collider2D>();
         Collider2D _col;
         float _activeGravity = 1.4f;
         bool _activated;
@@ -128,6 +128,10 @@ namespace Kebamm
             foreach (var other in LiveColliders)
                 if (other != _col)
                     Physics2D.IgnoreCollision(_col, other, true);
+            // Monsters and buildings may overlap at spawn: no collision between them.
+            KebammObstacle.LiveColliders.RemoveAll(c => c == null);
+            foreach (var ob in KebammObstacle.LiveColliders)
+                Physics2D.IgnoreCollision(_col, ob, true);
             if (!LiveColliders.Contains(_col))
                 LiveColliders.Add(_col);
         }
@@ -209,6 +213,7 @@ namespace Kebamm
             _health = Mathf.Max(0f, monsterHealth - ballDamage);
             bool ballBroken = ball.TakeDamage(ballDamage);
             Debug.Log($"[Kebamm] Impact Damage={damage} (ball {ballDamage} - monster {monsterHealth}). Monster HP={_health}/{maxHealth}. Ball HP={ball.Health}");
+            KebammFrameSpikeLog.Impacts++;
             KebammScore.AddHit(_hitPts);
             if (KebammPrototypeBootstrap.Instance != null)
                 KebammPrototypeBootstrap.Instance.NotifyMonsterImpact();

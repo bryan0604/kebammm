@@ -91,13 +91,12 @@ namespace Kebamm
             if (_preview == null)
                 return;
 
-            Vector3 pos = _preview.transform.position;
-            var colour = _preview.Colour;
-            int tier = _preview.Tier;
-            Destroy(_preview.gameObject);
+            // Reuse the held ball as the dropped ball instead of destroying it and building a new
+            // GameObject in the same frame (removes one create + one destroy per drop).
+            var held = _preview;
             _preview = null;
-
-            _bootstrap.SpawnBall(pos, colour, tier, preview: false);
+            held.transform.position = new Vector3(held.transform.position.x, DropY, 0f);
+            _bootstrap.ReleasePreview(held);
             _cooldownLeft = DropCooldown;
             SpawnPreview();
         }
@@ -107,8 +106,12 @@ namespace Kebamm
             if (_preview != null)
                 Destroy(_preview.gameObject);
 
+            // The held ball shows the next colour and tier ahead of the drop; it is re-rolled after each drop.
             var colour = _bootstrap.NextQueuedColour();
-            _preview = _bootstrap.SpawnBall(new Vector3(0f, DropY, 0f), colour, 0, preview: true);
+            int tier = _bootstrap.NextQueuedTier();
+            _preview = _bootstrap.SpawnBall(new Vector3(0f, DropY, 0f), colour, tier, preview: true);
+            if (_preview != null)
+                UpdateAim();
             if (_preview != null)
                 _preview.gameObject.SetActive(_canDrop && !_container.IsOpen);
         }

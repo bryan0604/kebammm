@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 namespace Kebamm
 {
@@ -43,6 +43,34 @@ namespace Kebamm
                 }
             }
 
+            tex.Apply();
+            tex.filterMode = FilterMode.Bilinear;
+            tex.wrapMode = TextureWrapMode.Clamp;
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        }
+
+        static Sprite _triangle;
+
+        /// <summary>White isosceles triangle, base along the bottom, 1 x 1 unit, pivot at the centre.</summary>
+        public static Sprite TriangleSprite
+        {
+            get
+            {
+                if (_triangle == null)
+                    _triangle = BuildTriangle(64);
+                return _triangle;
+            }
+        }
+
+        static Sprite BuildTriangle(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            for (int y = 0; y < size; y++)
+            {
+                float half = (1f - (y + 0.5f) / size) * size * 0.5f;
+                for (int x = 0; x < size; x++)
+                    tex.SetPixel(x, y, Mathf.Abs(x + 0.5f - size * 0.5f) <= half ? Color.white : Color.clear);
+            }
             tex.Apply();
             tex.filterMode = FilterMode.Bilinear;
             tex.wrapMode = TextureWrapMode.Clamp;

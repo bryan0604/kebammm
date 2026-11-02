@@ -38,7 +38,7 @@ namespace Kebamm
      *
      * CONTROLS:
      *   Mouse X     - aim drop position (clamped inside walls)
-     *   LMB / Space - drop next queued ball (tier 0, random of 4 colours)
+     *   LMB / Space - drop next queued ball (tier rolled from level ball tier range; tier 0 if unset)
      *   R           - reset container (close floor, clear balls, restore every monster HP)
      *
      * HOW TO RUN:
@@ -69,6 +69,10 @@ namespace Kebamm
         Transform _ballsRoot;
         Transform _worldRoot;
         bool _bombingRun;
+        /// <summary>True once the container floor has opened (bombing run).</summary>
+        public bool IsBombingRun => _bombingRun || (_container != null && _container.IsOpen);
+        readonly List<KebammObstacle> _obstacles = new List<KebammObstacle>();
+        // Building stacks as (centre X, half width incl. widest building) so monsters can keep clear of them.
         float _bombingIdleTimer;
         const float BombingIdleSeconds = 5f;
         KebammGameLevel _gameLevel;
@@ -142,6 +146,7 @@ namespace Kebamm
                 ResetSession();
 
             TickBombingRunIdle();
+            KebammFrameSpikeLog.EndFrame();
         }
 
         static void EnsurePhysicsMaterial()
@@ -222,13 +227,17 @@ namespace Kebamm
             ballsGo.transform.SetParent(_worldRoot, false);
             _ballsRoot = ballsGo.transform;
 
+            // Warm caches used on every drop/merge so placing a ball never loads assets mid-play.
+            KebammBall.PrewarmArt();
+            KebammBallTierData.ImpactStrengthForPlayTier(0);
+
             var groundGo = new GameObject("Ground");
             groundGo.transform.SetParent(_worldRoot, false);
             groundGo.transform.position = new Vector3(0f, MonsterY - 1f, 0f);
             var gSr = groundGo.AddComponent<SpriteRenderer>();
             gSr.sprite = KebammVisualFactory.SquareSprite;
             gSr.color = new Color(0.22f, 0.28f, 0.22f);
-            gSr.sortingOrder = 0;
+            gSr.sortingOrder = -1; // below building obstacles (0), which sit 1 layer behind monsters (1)
             groundGo.transform.localScale = new Vector3(GroundWidth, GroundThickness, 1f);
             groundGo.AddComponent<BoxCollider2D>();
             // Background art draws its own grass; keep the collider, hide the flat ground strip.
@@ -320,6 +329,8 @@ namespace Kebamm
             float stackCeiling = ContainerFloorY - WallThickness - 0.05f;
             var stacks = new List<List<KebammMonster>>();
             var openStacks = new List<List<KebammMonster>>();
+            // Buildings first. Monsters may overlap them (drawn 1 layer in front, no collision between them).
+            SpawnObstacles(level, groundTop, halfPlatform, stackCeiling);
 
             for (int i = 0; i < spawnCount; i++)
             {
@@ -385,6 +396,168 @@ namespace Kebamm
         }
 
         const int MaxMonsterStack = 5;
+        const int MaxObstacleStack = 3;
+
+        class ObstacleStack
+        {
+            public readonly List<KebammObstacle> Items = new List<KebammObstacle>();
+            public float X, HalfWidth, Spacing;
+        }
+
+        static bool OverlapsObstacleStacks(List<ObstacleStack> stacks, ObstacleStack self, float x, float halfWidth, float spacing)
+        {
+            for (int s = 0; s < stacks.Count; s++)
+            {
+                ObstacleStack o = stacks[s];
+                if (o == self)
+                    continue;
+                if (Mathf.Abs(x - o.X) < halfWidth + o.HalfWidth + Mathf.Max(0.02f, Mathf.Max(spacing, o.Spacing)))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Building obstacles: only when the level has obstaclePopulate on and prepopulateObstacleQty &gt; 0, using
+        /// Obstacle Data shapes that have hp, width and height filled. Stacks only on buildings (max 3; nothing on a
+        /// triangle's tip), never overlap each other, X from prepopulateObstaclePositionRangeX within the platform.
+        /// </summary>
+        void SpawnObstacles(KebammLevel level, float groundTop, float halfPlatform, float stackCeiling)
+        {
+            for (int i = 0; i < _obstacles.Count; i++)
+                if (_obstacles[i] != null)
+                    Destroy(_obstacles[i].gameObject);
+            _obstacles.Clear();
+
+            if (level == null || !level.obstaclePopulate || level.prepopulateObstacleQty <= 0)
+                return;
+
+            var shapes = new List<KebammObstacleData>();
+            foreach (KebammObstacleData d in Resources.LoadAll<KebammObstacleData>("Kebamm"))
+            {
+                if (d == null || !d.IsUsable)
+                    continue;
+                if (level.allowedObstacleShapes != null && level.allowedObstacleShapes.Count > 0 && !level.allowedObstacleShapes.Contains(d.shape))
+                    continue;
+                shapes.Add(d);
+            }
+            if (shapes.Count == 0)
+            {
+                Debug.LogWarning($"[Kebamm] Level {level.levelNumber}: obstacles on but no Obstacle Data shape has hp, width and height filled; none spawned.");
+                return;
+            }
+
+            float rangeMin = Mathf.Max(-halfPlatform, level.prepopulateObstaclePositionRangeX.x);
+            float rangeMax = Mathf.Min(halfPlatform, level.prepopulateObstaclePositionRangeX.y);
+            var stacks = new List<ObstacleStack>();
+            var open = new List<ObstacleStack>();
+
+            for (int i = 0; i < level.prepopulateObstacleQty; i++)
+            {
+                KebammObstacleData data = shapes[Random.Range(0, shapes.Count)];
+                float w = data.width, h = data.height, half = w * 0.5f;
+                ObstacleStack target = null;
+                float x = 0f, y = 0f;
+
+                if (stacks.Count > 0 && Random.value < level.obstacleStackChance)
+                {
+                    open.Clear();
+                    for (int s = 0; s < stacks.Count; s++)
+                    {
+                        var st = stacks[s];
+                        if (st.Items.Count < MaxObstacleStack && st.Items[st.Items.Count - 1].Shape != KebammObstacleShape.Triangle)
+                            open.Add(st);
+                    }
+                    while (open.Count > 0 && target == null)
+                    {
+                        int pick = Random.Range(0, open.Count);
+                        var st = open[pick];
+                        float cy = st.Items[st.Items.Count - 1].TopY + StackGap + h * 0.5f;
+                        float newHalf = Mathf.Max(st.HalfWidth, half);
+                        if (cy + h * 0.5f <= stackCeiling && Mathf.Abs(st.X) <= halfPlatform - half
+                            && !OverlapsObstacleStacks(stacks, st, st.X, newHalf, Mathf.Max(st.Spacing, data.stackSpacing)))
+                        {
+                            target = st;
+                            x = st.X;
+                            y = cy;
+                        }
+                        open.RemoveAt(pick);
+                    }
+                }
+
+                if (target == null)
+                {
+                    float lo = rangeMin + half, hi = rangeMax - half;
+                    if (hi < lo)
+                    {
+                        lo = -halfPlatform + half;
+                        hi = halfPlatform - half;
+                    }
+                    if (hi < lo)
+                        continue; // wider than the platform
+                    bool found = false;
+                    for (int attempt = 0; attempt < 12 && !found; attempt++)
+                    {
+                        x = Random.Range(lo, hi);
+                        found = !OverlapsObstacleStacks(stacks, null, x, half, data.stackSpacing);
+                    }
+                    if (!found)
+                    {
+                        Debug.LogWarning($"[Kebamm] Obstacle {i + 1}/{level.prepopulateObstacleQty} ({data.shape}) skipped: no free spot without overlapping.");
+                        continue;
+                    }
+                    y = groundTop + h * 0.5f;
+                }
+
+                KebammObstacle ob = SpawnObstacle(data, new Vector3(x, y, 0f), halfPlatform);
+                _obstacles.Add(ob);
+                if (target == null)
+                {
+                    target = new ObstacleStack { X = x };
+                    stacks.Add(target);
+                }
+                target.Items.Add(ob);
+                target.HalfWidth = Mathf.Max(target.HalfWidth, half);
+                target.Spacing = Mathf.Max(target.Spacing, data.stackSpacing);
+            }
+
+            Debug.Log($"[Kebamm] Level {level.levelNumber}: spawned {_obstacles.Count} obstacles in {stacks.Count} stacks");
+        }
+
+        KebammObstacle SpawnObstacle(KebammObstacleData data, Vector3 position, float halfPlatform)
+        {
+            var go = new GameObject("Obstacle");
+            go.transform.SetParent(_worldRoot, false);
+            go.transform.position = position;
+            go.transform.localScale = new Vector3(data.width, data.height, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = 0; // 1 layer behind monsters (1)
+            Collider2D col;
+            if (data.shape == KebammObstacleShape.Triangle)
+            {
+                sr.sprite = KebammVisualFactory.TriangleSprite;
+                var poly = go.AddComponent<PolygonCollider2D>();
+                poly.points = new[] { new Vector2(-0.5f, -0.5f), new Vector2(0.5f, -0.5f), new Vector2(0f, 0.5f) };
+                col = poly;
+            }
+            else
+            {
+                sr.sprite = KebammVisualFactory.SquareSprite;
+                col = go.AddComponent<BoxCollider2D>();
+            }
+            col.sharedMaterial = KebammObstacle.SharedMaterial;
+            var rb = go.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Dynamic;
+            rb.simulated = true;
+            rb.linearDamping = 0.2f;
+            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            rb.sharedMaterial = KebammObstacle.SharedMaterial;
+            var ob = go.AddComponent<KebammObstacle>();
+            float edge = Mathf.Max(0f, halfPlatform - data.width * 0.5f);
+            ob.Init(data, -edge, edge);
+            return ob;
+        }
         const float StackGap = 0.01f;
 
         static float MonsterCenterX(KebammMonster m)
@@ -495,6 +668,13 @@ namespace Kebamm
             return RandomLevelColour();
         }
 
+        /// <summary>Play tier (GDD tier - 1) of the next ball, rolled from the level's ball tier range and weights.</summary>
+        public int NextQueuedTier()
+        {
+            KebammLevel level = CurrentLevel;
+            return level != null ? level.RollDropPlayTier() : 0;
+        }
+
         KebammLevel CurrentLevel =>
             _levelIndex >= 0 && _levelIndex < _activeLevels.Count ? _activeLevels[_levelIndex] : null;
 
@@ -528,6 +708,21 @@ namespace Kebamm
             return ball;
         }
 
+        /// <summary>
+        /// Turns the held preview ball into a live ball in place (same object, no destroy/re-create),
+        /// exactly as SpawnBall(position, colour, tier, preview: false) would configure it.
+        /// </summary>
+        public KebammBall ReleasePreview(KebammBall preview)
+        {
+            if (preview == null)
+                return null;
+            preview.transform.SetParent(_ballsRoot, true);
+            preview.Configure(preview.Colour, preview.Tier, preview: false);
+            ResetBombingIdleTimer();
+            KebammFrameSpikeLog.Drops++;
+            return preview;
+        }
+
         public void SpawnMergedBall(Vector3 position, KebammBallColour colour, int tier, float startDiameter = -1f)
         {
             var ball = SpawnBall(position, colour, tier, preview: false);
@@ -537,6 +732,7 @@ namespace Kebamm
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
             _capacity?.NotifyMerge(ball);
+            KebammFrameSpikeLog.Merges++;
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
             KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
         }

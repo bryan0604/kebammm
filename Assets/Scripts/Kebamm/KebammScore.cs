@@ -49,6 +49,17 @@ namespace Kebamm
             Changed?.Invoke();
         }
 
+        /// <summary>Building destroyed: points go into the combined HUD score; does not count as a monster destroyed (stars).</summary>
+        public static void AddObstacleDestroy(int points)
+        {
+            if (_locked)
+                return;
+
+            MonsterScore += points;
+            Debug.Log($"[Kebamm] Obstacle destroy score +{points} total={MonsterScore}");
+            Changed?.Invoke();
+        }
+
         public static void AddDestroy(int points)
         {
             if (_locked)
