@@ -62,7 +62,8 @@ namespace Kebamm
             // Mouse is skipped while a touch is active this frame, so simulated mouse-from-touch cannot double-drop.
             if (!touchActive)
             {
-                if (Mouse.current != null)
+                // Follow the mouse only when it moved: on mobile an idle Mouse device reads (0,0) = far left.
+                if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
                     UpdateAim(Mouse.current.position.ReadValue());
                 if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !PointerOverUi(-1))
                     dropPressed = true;
@@ -115,12 +116,16 @@ namespace Kebamm
         // Last aim position (mouse or finger), reused when a new held ball spawns after a drop.
         Vector2? _lastAimScreen;
 
+        // Launcher X kept for the app session (static), so new levels and restarts start where the last ball
+        // was aimed (GDD Controls). Not saved to disk: an app restart starts from the centre again.
+        static float? s_sessionLauncherX;
+
         void UpdateAim()
         {
             if (_lastAimScreen.HasValue)
                 UpdateAim(_lastAimScreen.Value);
-            else if (Mouse.current != null)
-                UpdateAim(Mouse.current.position.ReadValue());
+            else if (s_sessionLauncherX.HasValue)
+                PlaceAtWorldX(s_sessionLauncherX.Value);
             else if (_preview != null)
                 UpdateAim(Camera.main != null ? (Vector2)Camera.main.WorldToScreenPoint(transform.position) : Vector2.zero);
         }
@@ -143,12 +148,20 @@ namespace Kebamm
                 Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
                 x = world.x;
             }
+            PlaceAtWorldX(x);
+        }
 
+        /// <summary>Clamps to the current container's inner width (it can differ per level) and moves the held ball.</summary>
+        void PlaceAtWorldX(float x)
+        {
+            if (_preview == null || _container == null)
+                return;
             float pad = _preview.Radius + 0.05f;
             float minX = _container.transform.position.x - _container.InnerHalfWidth + pad;
             float maxX = _container.transform.position.x + _container.InnerHalfWidth - pad;
             x = Mathf.Clamp(x, minX, maxX);
             _preview.transform.position = new Vector3(x, DropY, 0f);
+            s_sessionLauncherX = x;
         }
 
         void Drop()
