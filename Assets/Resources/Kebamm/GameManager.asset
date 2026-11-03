@@ -10,12 +10,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7c1e9a4b2d8f4e6a91b03c5d7e8f0a12, type: 3}
-  m_Name: GameData
+  m_Name: GameManager
   m_EditorClassIdentifier: 
-  tiers:
-  - tier: 1
-    size: 0.25
-  - tier: 2
-    size: 0.35
-  - tier: 3
-    size: 0.45
+  pillarHeight: 5.8
+  pillarGapWidth: 5
+  capsLineHeight: 4.95

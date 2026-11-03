@@ -17,3 +17,4 @@ MonoBehaviour:
   hp: 1
   mergePts: 60
   impactStrength: 7.5
+  ballSize: 1.12

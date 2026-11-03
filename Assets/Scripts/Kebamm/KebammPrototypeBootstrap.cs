@@ -51,12 +51,13 @@ namespace Kebamm
         public static PhysicsMaterial2D SharedPhysicsMaterial { get; private set; }
 
         [Header("Layout")]
+        // Container width/height and cap line come from Game Manager data (Resources/Kebamm/GameManager); defaults below if missing.
         public float ContainerWidth = 5.0f;
         public float ContainerHeight = 5.8f;
+        public float CapsLineHeight = 4.95f;
         // Inner floor top (world y). The container grows upward from here as height changes.
         public float ContainerFloorY = -2.5f;
         public float WallThickness = 0.25f;
-        public float CapacityFromTop = 0.85f;
         public float MonsterY = -5.2f;
         public float GroundWidth = 8f;
         public float GroundThickness = 0.35f;
@@ -196,6 +197,51 @@ namespace Kebamm
             return true;
         }
 
+        KebammGameManagerData _gameManager;
+        bool _layoutDirty;
+
+        void LoadGameManager()
+        {
+            _gameManager = Resources.Load<KebammGameManagerData>("Kebamm/GameManager");
+            if (_gameManager == null)
+            {
+                Debug.LogWarning("[Kebamm] GameManager missing from Resources; using bootstrap layout defaults.");
+                return;
+            }
+            ContainerWidth = _gameManager.PillarGapWidth;
+            ContainerHeight = _gameManager.PillarHeight;
+            CapsLineHeight = _gameManager.CapsLineHeight;
+        }
+
+        void OnEnable() { KebammGameManagerData.Changed += OnGameManagerChanged; }
+        void OnDisable() { KebammGameManagerData.Changed -= OnGameManagerChanged; }
+
+        void OnGameManagerChanged(KebammGameManagerData data)
+        {
+            if (data == _gameManager)
+                _layoutDirty = true; // applied in LateUpdate (OnValidate is not a safe place to move colliders)
+        }
+
+        void LateUpdate()
+        {
+            if (!_layoutDirty || _gameManager == null || _container == null)
+                return;
+            _layoutDirty = false;
+            LoadGameManager();
+            ApplyLayout();
+        }
+
+        /// <summary>Live re-layout from Game Manager data: walls, floor, cap line/band and launcher height + clamp.</summary>
+        void ApplyLayout()
+        {
+            _container.Layout(ContainerWidth, ContainerHeight, WallThickness, CapsLineHeight);
+            if (_capacity != null)
+                _capacity.SetBand(_container.CapacityY, ContainerWidth * 0.95f);
+            if (_dropper != null)
+                _dropper.DropY = _container.TopY + 0.35f;
+            Debug.Log($"[Kebamm] Game Manager layout: pillar height {ContainerHeight}, gap {ContainerWidth}, caps line {CapsLineHeight}");
+        }
+
         void BuildWorld()
         {
             var cam = Camera.main;
@@ -212,9 +258,10 @@ namespace Kebamm
 
             var containerGo = new GameObject("Container");
             containerGo.transform.SetParent(_worldRoot, false);
+            LoadGameManager();
             containerGo.transform.position = new Vector3(0f, ContainerFloorY + ContainerHeight * 0.5f, 0f);
             _container = containerGo.AddComponent<KebammContainer>();
-            _container.Build(ContainerWidth, ContainerHeight, WallThickness, CapacityFromTop);
+            _container.Build(ContainerFloorY, ContainerWidth, ContainerHeight, WallThickness, CapsLineHeight);
 
             var capGo = new GameObject("CapacityTrigger");
             capGo.transform.SetParent(containerGo.transform, false);
@@ -249,7 +296,7 @@ namespace Kebamm
             var dropGo = new GameObject("DropController");
             dropGo.transform.SetParent(_worldRoot, false);
             _dropper = dropGo.AddComponent<KebammDropController>();
-            float dropY = containerGo.transform.position.y + ContainerHeight * 0.5f + 0.35f;
+            float dropY = _container.TopY + 0.35f;
             _dropper.Init(this, _container, dropY);
 
             var hudGo = new GameObject("ScoreHud");
@@ -281,13 +328,6 @@ namespace Kebamm
             }
             _monsters.Clear();
             KebammLevel level = CurrentLevel;
-
-            KebammGameData gameData = Resources.Load<KebammGameData>("Kebamm/GameData");
-            if (gameData == null)
-            {
-                gameData = ScriptableObject.CreateInstance<KebammGameData>();
-                Debug.LogWarning("[Kebamm] GameData missing from Resources; using in-memory defaults.");
-            }
 
             KebammLevelData levelData = Resources.Load<KebammLevelData>("Kebamm/LevelData");
             if (levelData == null)
@@ -335,7 +375,7 @@ namespace Kebamm
             for (int i = 0; i < spawnCount; i++)
             {
                 KebammMonsterData data = monsterDatas[Random.Range(0, monsterDatas.Length)];
-                float size = gameData.SizeForTier(data.tier);
+                float size = data.ResolveSize(); // Monster Tier Data size (fallback 0.25/0.35/0.45)
                 if (size < 0.05f)
                     size = 0.05f;
 
@@ -366,9 +406,9 @@ namespace Kebamm
                         KebammMonster top = candidate[candidate.Count - 1];
                         float topY = MonsterTopY(top);
                         float candidateY = topY + StackGap + size * 0.5f;
-                        // Must also sit inside this monster's own edge bounds, or the edge clamp would shift its X.
+                        // Whole body must stay inside the platform with the SpawnInset margin (never at the edge).
                         float stackX = MonsterCenterX(candidate[0]);
-                        if (candidateY + size * 0.5f <= stackCeiling && Mathf.Abs(stackX) <= halfPlatform - size * 0.5f)
+                        if (candidateY + size * 0.5f <= stackCeiling && Mathf.Abs(stackX) <= halfPlatform - size * 0.5f - SpawnInset)
                         {
                             target = candidate;
                             // Same X as the bottom monster's collider centre (new monster's collider offset is 0); only Y rises.
@@ -447,8 +487,10 @@ namespace Kebamm
                 return;
             }
 
-            float rangeMin = Mathf.Max(-halfPlatform, level.prepopulateObstaclePositionRangeX.x);
-            float rangeMax = Mathf.Min(halfPlatform, level.prepopulateObstaclePositionRangeX.y);
+            // Safe area: whole building stays inside the platform with the SpawnInset margin (never at the edge).
+            float safeHalf = Mathf.Max(0f, halfPlatform - SpawnInset);
+            float rangeMin = Mathf.Max(-safeHalf, level.prepopulateObstaclePositionRangeX.x);
+            float rangeMax = Mathf.Min(safeHalf, level.prepopulateObstaclePositionRangeX.y);
             var stacks = new List<ObstacleStack>();
             var open = new List<ObstacleStack>();
 
@@ -474,7 +516,7 @@ namespace Kebamm
                         var st = open[pick];
                         float cy = st.Items[st.Items.Count - 1].TopY + StackGap + h * 0.5f;
                         float newHalf = Mathf.Max(st.HalfWidth, half);
-                        if (cy + h * 0.5f <= stackCeiling && Mathf.Abs(st.X) <= halfPlatform - half
+                        if (cy + h * 0.5f <= stackCeiling && Mathf.Abs(st.X) <= safeHalf - half
                             && !OverlapsObstacleStacks(stacks, st, st.X, newHalf, Mathf.Max(st.Spacing, data.stackSpacing)))
                         {
                             target = st;
@@ -490,8 +532,8 @@ namespace Kebamm
                     float lo = rangeMin + half, hi = rangeMax - half;
                     if (hi < lo)
                     {
-                        lo = -halfPlatform + half;
-                        hi = halfPlatform - half;
+                        lo = -safeHalf + half;
+                        hi = safeHalf - half;
                     }
                     if (hi < lo)
                         continue; // wider than the platform

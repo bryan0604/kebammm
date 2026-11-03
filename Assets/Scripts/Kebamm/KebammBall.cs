@@ -28,8 +28,8 @@ namespace Kebamm
 
         public Rigidbody2D Body => _rb;
         public Collider2D Col => _col;
-        /// <summary>Set by KebammCapacityMonitor once this ball first comes to rest after spawning.</summary>
-        public bool HasSettled { get; set; }
+        /// <summary>Play state: true from this ball's first contact with another ball, the floor or a wall (merged balls inherit it).</summary>
+        public bool InPlay { get; set; }
 
         void OnDestroy()
         {
@@ -38,7 +38,7 @@ namespace Kebamm
             _registered = false;
         }
 
-        public float Radius => 0.28f + Tier * 0.14f;
+        public float Radius => KebammBallTierData.DiameterForPlayTier(Tier) * 0.5f;
 
         // Merge: the merged ball appears at the midpoint of the two balls and grows from the pre-merge size
         // to the new tier size, so physics pushes neighbours aside gradually.
@@ -197,7 +197,11 @@ namespace Kebamm
 
         void OnCollisionEnter2D(Collision2D collision)
         {
-            if (IsPreview || IsMerging)
+            if (IsPreview)
+                return;
+            if (!collision.collider.isTrigger)
+                InPlay = true; // first touch on a ball, floor or wall
+            if (IsMerging)
                 return;
 
             var other = collision.collider.GetComponent<KebammBall>();

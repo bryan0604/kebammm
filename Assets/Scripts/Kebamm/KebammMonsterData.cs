@@ -10,6 +10,22 @@ namespace Kebamm
         [Range(1, 3)] public int tier = 1;
         public int hitPts;
         public int destroyedPts;
+        [Tooltip("Monster size (world units) for this tier (Notion Monster Tier Data 'size'). 0 = fallback 0.25 / 0.35 / 0.45 for tier 1 / 2 / 3.")]
+        public float size;
+
+        public float ResolveSize()
+        {
+            return size > 0f ? size : FallbackSize(tier);
+        }
+
+        public static float FallbackSize(int tier)
+        {
+            if (tier <= 1)
+                return 0.25f;
+            if (tier == 2)
+                return 0.35f;
+            return 0.45f;
+        }
 
         public void ResolveScore(out int hit, out int destroyed)
         {

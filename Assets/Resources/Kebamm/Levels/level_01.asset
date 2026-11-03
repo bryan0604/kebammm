@@ -28,7 +28,9 @@ MonoBehaviour:
   obstaclePopulate: 1
   obstacleStackChance: 0.3
   allowedObstacleShapes:
+  - 0
   - 1
+  - 2
   ballTierMin: 1
   ballTierMax: 3
   ballTier1Weight: 60

@@ -12,6 +12,8 @@ namespace Kebamm
         public int mergePts;
         [Tooltip("Launch speed (units/s) given to a monster hit by this tier: up + away from the impact side.")]
         public float impactStrength = 3f;
+        [Tooltip("Ball diameter in world units for this tier (spawn, held ball, merge grow, collider and art all scale to it). 0 = fallback formula 2*(0.28+0.14*(tier-1)).")]
+        public float ballSize;
 
         static Dictionary<int, KebammBallTierData> _byTier;
 
@@ -50,6 +52,21 @@ namespace Kebamm
             if (_byTier != null && _byTier.TryGetValue(dataTier, out KebammBallTierData row) && row != null && row.impactStrength > 0f)
                 return row.impactStrength;
             return 2f + dataTier * 0.5f;
+        }
+
+        /// <summary>Diameter for a code tier (0-based). Uses the tier row's ballSize; the merge-only top tier (no row) and 0/missing values use the formula.</summary>
+        public static float DiameterForPlayTier(int playTier)
+        {
+            int dataTier = playTier + 1;
+            Ensure();
+            if (_byTier != null && _byTier.TryGetValue(dataTier, out KebammBallTierData row) && row != null && row.ballSize > 0f)
+                return row.ballSize;
+            return DefaultDiameterForPlayTier(playTier);
+        }
+
+        public static float DefaultDiameterForPlayTier(int playTier)
+        {
+            return 2f * (0.28f + Mathf.Max(0, playTier) * 0.14f);
         }
 
         public static int DefaultMergePts(int dataTier)

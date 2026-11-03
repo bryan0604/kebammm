@@ -1,10 +1,13 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace Kebamm
 {
     /// <summary>
     /// Mouse X aims drop position; left-click or Space drops the queued ball.
+    /// Touch (GDD Mobile - Touch Screen Control): touch and hold anywhere, the launcher jumps to the
+    /// first finger's X; releasing that finger drops the ball. Touches that start on UI are ignored.
     /// Uses the new Input System (project activeInputHandler = Input System Only).
     /// </summary>
     public class KebammDropController : MonoBehaviour
@@ -17,6 +20,8 @@ namespace Kebamm
         KebammBall _preview;
         float _cooldownLeft;
         bool _canDrop = true;
+        // Primary-finger state: holding = aiming with a touch that did not start on UI.
+        bool _touchHolding;
 
         public void Init(KebammPrototypeBootstrap bootstrap, KebammContainer container, float dropY)
         {
@@ -46,13 +51,22 @@ namespace Kebamm
                 _preview.gameObject.SetActive(allowDrop);
 
             if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked)
+            {
+                _touchHolding = false; // cancel a hold; lifting later must not drop
                 return;
-
-            UpdateAim();
+            }
 
             bool dropPressed = false;
-            if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
-                dropPressed = true;
+            bool touchActive = HandleTouch(ref dropPressed);
+
+            // Mouse is skipped while a touch is active this frame, so simulated mouse-from-touch cannot double-drop.
+            if (!touchActive)
+            {
+                if (Mouse.current != null)
+                    UpdateAim(Mouse.current.position.ReadValue());
+                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !PointerOverUi(-1))
+                    dropPressed = true;
+            }
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
                 dropPressed = true;
 
@@ -60,16 +74,67 @@ namespace Kebamm
                 Drop();
         }
 
+        /// <summary>Primary finger only (extra fingers are ignored until it lifts). Returns true if a touch was active this frame.</summary>
+        bool HandleTouch(ref bool dropPressed)
+        {
+            var ts = Touchscreen.current;
+            if (ts == null)
+                return false;
+            var touch = ts.primaryTouch;
+            bool pressed = touch.press.wasPressedThisFrame;
+            bool held = touch.press.isPressed;
+            bool released = touch.press.wasReleasedThisFrame;
+            if (!pressed && !held && !released)
+                return false;
+
+            int id = touch.touchId.ReadValue();
+            if (pressed)
+                _touchHolding = !PointerOverUi(id);
+            // UI hover can lag a frame behind the press, so also cancel if the finger is over UI while held.
+            if (_touchHolding && PointerOverUi(id))
+                _touchHolding = false;
+            if (_touchHolding)
+                UpdateAim(touch.position.ReadValue());
+            if (released)
+            {
+                if (_touchHolding)
+                    dropPressed = true;
+                _touchHolding = false;
+            }
+            return true;
+        }
+
+        static bool PointerOverUi(int pointerId)
+        {
+            var es = EventSystem.current;
+            if (es == null)
+                return false;
+            return pointerId >= 0 ? es.IsPointerOverGameObject(pointerId) : es.IsPointerOverGameObject();
+        }
+
+        // Last aim position (mouse or finger), reused when a new held ball spawns after a drop.
+        Vector2? _lastAimScreen;
+
         void UpdateAim()
+        {
+            if (_lastAimScreen.HasValue)
+                UpdateAim(_lastAimScreen.Value);
+            else if (Mouse.current != null)
+                UpdateAim(Mouse.current.position.ReadValue());
+            else if (_preview != null)
+                UpdateAim(Camera.main != null ? (Vector2)Camera.main.WorldToScreenPoint(transform.position) : Vector2.zero);
+        }
+
+        void UpdateAim(Vector2 screen)
         {
             if (_preview == null)
                 return;
+            _lastAimScreen = screen;
 
             float x = transform.position.x;
             var cam = Camera.main;
-            if (Mouse.current != null && cam != null)
+            if (cam != null)
             {
-                Vector2 screen = Mouse.current.position.ReadValue();
                 // ScreenToWorldPoint's z is distance from the camera, not world Z.
                 // Camera sits at z=-10 looking at gameplay on z=0.
                 float depth = Mathf.Abs(cam.transform.position.z);

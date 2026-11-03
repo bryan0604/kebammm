@@ -17,3 +17,4 @@ MonoBehaviour:
   tier: 1
   hitPts: 13
   destroyedPts: 250
+  size: 0.25

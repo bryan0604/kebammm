@@ -56,6 +56,8 @@ namespace Kebamm
             StackSpacing = data.stackSpacing;
             _health = data.hp;
             _destroyed = false;
+            foreach (var c in GetComponents<Collider2D>())
+                c.enabled = true;
             _minX = Mathf.Min(minX, maxX);
             _maxX = Mathf.Max(minX, maxX);
             _sr = GetComponent<SpriteRenderer>();
@@ -121,6 +123,8 @@ namespace Kebamm
 #endif
             KebammFrameSpikeLog.Impacts++;
             boot.NotifyMonsterImpact(); // counts as bombing-run activity
+            // Damage text, same as monster hits.
+            KebammDamageNumber.Spawn(_sr.bounds, ballDamage);
 
             Activate();
             Push(ball, collision);
@@ -138,6 +142,32 @@ namespace Kebamm
                 _destroyed = true;
                 _sr.color = DestroyedColour;
                 KebammScore.AddObstacleDestroy(_data.destroyedPts);
+                BecomeRubble();
+            }
+        }
+
+        // HP <= 0: frozen in place with no collision, so balls, monsters and buildings pass through.
+        // Buildings stacked above lose their support, so they are activated and fall under gravity.
+        void BecomeRubble()
+        {
+            float top = TopY;
+            float halfW = Width * 0.5f;
+            float x = transform.position.x;
+            _rb.linearVelocity = Vector2.zero;
+            _rb.angularVelocity = 0f;
+            _rb.gravityScale = 0f;
+            _rb.constraints = RigidbodyConstraints2D.FreezeAll;
+            foreach (var c in GetComponents<Collider2D>())
+                c.enabled = false;
+            LiveColliders.RemoveAll(c => c == null);
+            foreach (var c in LiveColliders)
+            {
+                var other = c.GetComponent<KebammObstacle>();
+                if (other == null || other == this || other._destroyed)
+                    continue;
+                float ox = other.transform.position.x, oBottom = other.transform.position.y - other.Height * 0.5f;
+                if (oBottom >= top - 0.05f && Mathf.Abs(ox - x) < halfW + other.Width * 0.5f)
+                    other.Activate();
             }
         }
 
