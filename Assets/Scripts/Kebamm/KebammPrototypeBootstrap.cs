@@ -127,6 +127,9 @@ namespace Kebamm
             Instance = this;
             GameplayInputBlocked = false;
             EnsurePhysicsMaterial();
+            // Remote data: apply the cached copy (already accepted) at launch; the Gist is checked on the main menu.
+            KebammRemoteData.Begin(this);
+            KebammRemoteData.CommitPending();
             LoadLevels();
             BuildWorld();
         }
@@ -202,7 +205,7 @@ namespace Kebamm
 
         void LoadGameManager()
         {
-            _gameManager = Resources.Load<KebammGameManagerData>("Kebamm/GameManager");
+            _gameManager = KebammRemoteData.ForGameManager(Resources.Load<KebammGameManagerData>("Kebamm/GameManager"));
             if (_gameManager == null)
             {
                 Debug.LogWarning("[Kebamm] GameManager missing from Resources; using bootstrap layout defaults.");
@@ -213,8 +216,8 @@ namespace Kebamm
             CapsLineHeight = _gameManager.CapsLineHeight;
         }
 
-        void OnEnable() { KebammGameManagerData.Changed += OnGameManagerChanged; }
-        void OnDisable() { KebammGameManagerData.Changed -= OnGameManagerChanged; }
+        void OnEnable() { KebammGameManagerData.Changed += OnGameManagerChanged; KebammRemoteData.OfferReady += OnRemoteDataOffer; }
+        void OnDisable() { KebammGameManagerData.Changed -= OnGameManagerChanged; KebammRemoteData.OfferReady -= OnRemoteDataOffer; }
 
         void OnGameManagerChanged(KebammGameManagerData data)
         {
@@ -831,7 +834,8 @@ namespace Kebamm
                 return;
             }
 
-            _activeLevels.AddRange(_gameLevel.GetActiveLevels());
+            foreach (KebammLevel level in _gameLevel.GetActiveLevels())
+                _activeLevels.Add(KebammRemoteData.ForLevel(level));
             if (_activeLevels.Count == 0)
                 Debug.LogWarning("[Kebamm] game_level has no active levels; showing Level 1.");
         }
@@ -901,6 +905,40 @@ namespace Kebamm
             _bombingIdleTimer = 0f;
             _dropper?.SetDroppingEnabled(false);
             _dropper?.ClearPreview();
+            if (_mainMenu != null)
+                _mainMenu.Show();
+            ApplyRemoteDataIfPending();
+            KebammRemoteData.CheckOnline(this); // launch + every return to the menu; newer data is offered, not applied
+        }
+
+        void OnRemoteDataOffer()
+        {
+            if (InMainMenu)
+                _mainMenu.ShowUpdatePrompt();
+        }
+
+        /// <summary>Player said Yes on the update prompt: cache and apply the new data (main menu only).</summary>
+        public void AcceptRemoteData()
+        {
+            KebammRemoteData.AcceptOffer();
+            ApplyRemoteDataIfPending();
+        }
+
+        /// <summary>Applies downloaded remote data. Only at launch or while the main menu is up, never mid-level.</summary>
+        public void ApplyRemoteDataIfPending()
+        {
+            if (!KebammRemoteData.HasPending || !InMainMenu)
+                return;
+            if (!KebammRemoteData.CommitPending())
+                return;
+            int index = _levelIndex;
+            LoadLevels();
+            _levelIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _activeLevels.Count - 1));
+            if (_container != null)
+            {
+                LoadGameManager();
+                ApplyLayout();
+            }
             if (_mainMenu != null)
                 _mainMenu.Show();
         }

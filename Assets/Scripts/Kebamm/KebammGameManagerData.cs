@@ -22,6 +22,12 @@ namespace Kebamm
         [Tooltip("Max caps (red) line height in world units, measured up from the container floor top.")]
         public float capsLineHeight = 4.95f;
 
+        [Header("Remote Data")]
+        [Tooltip("URL of kebamm_data.json (raw Gist link). Empty = no online fetch; cached or built-in data is used.")]
+        public string remoteDataUrl = "";
+        [Tooltip("Seconds before the online fetch gives up and falls back to cached / built-in data.")]
+        public float remoteDataTimeoutSeconds = 5f;
+
         /// <summary>Raised when values change (Inspector edit) so the game can re-layout live.</summary>
         public static event Action<KebammGameManagerData> Changed;
 

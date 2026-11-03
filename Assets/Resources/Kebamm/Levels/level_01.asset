@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: level_01
   m_EditorClassIdentifier: 
   levelNumber: 1
-  monsterQty: 20
+  monsterQty: 6
   levelPrepopulate: 1
   prepopulateMonsterNumber: 3
   prepopulateBallColours: 000000000100000002000000

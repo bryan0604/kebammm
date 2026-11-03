@@ -46,6 +46,9 @@ namespace Kebamm
 
         public bool IsVisible => _root != null && _root.activeSelf;
 
+        TextMeshProUGUI _dataLabel;
+        GameObject _updateRoot;
+        TextMeshProUGUI _updateText;
         static TMP_FontAsset _font;
         static bool _fontTried;
 
@@ -154,7 +157,16 @@ namespace Kebamm
             _levelLabel.rectTransform.anchoredPosition =
                 new Vector2(0f, startRect.anchoredPosition.y + startRect.sizeDelta.y * 0.5f + 15f + 40f);
 
+            // Data version / time / source (online, cached, built-in), bottom-right corner.
+            _dataLabel = CreateLabel(_safe, "DataVersionText", KebammRemoteData.StatusText, 26f,
+                Vector2.zero, new Vector2(760f, 40f), new Color(1f, 1f, 1f, 0.8f));
+            _dataLabel.alignment = TextAlignmentOptions.BottomRight;
+            RectTransform dataRect = _dataLabel.rectTransform;
+            dataRect.anchorMin = dataRect.anchorMax = dataRect.pivot = new Vector2(1f, 0f);
+            dataRect.anchoredPosition = new Vector2(-20f, 16f);
+
             BuildSettingsPlaceholder(canvasGo.transform);
+            BuildUpdatePrompt(canvasGo.transform);
             RefreshLevel();
             StartIdleTweens();
         }
@@ -239,8 +251,8 @@ namespace Kebamm
 
         void BuildTitle()
         {
-            // Six letter images (Notion captions: K, E, B, A, M orange, M green).
-            string[] art = { "title_k", "title_e", "title_b", "title_a", "title_m_orange", "title_m_green" };
+            // Six letter images (Notion User Interface > Main menu: "V2 - Title Alphabet" K, E, B, A, M orange, M green). v1 title_* files kept.
+            string[] art = { "title_v2_k", "title_v2_e", "title_v2_b", "title_v2_a", "title_v2_m_orange", "title_v2_m_green" };
             string[] glyph = { "K", "E", "B", "A", "M", "M" };
             string[] fallbackHex = { "#3B82F6", "#EC4899", "#E11D48", "#F59E0B", "#F97316", "#84CC16" };
 
@@ -410,19 +422,81 @@ namespace Kebamm
             _settingsRoot.SetActive(false);
         }
 
+        // "New game data available" Yes / No prompt (same placeholder style as Settings). Its dimmer blocks menu input.
+        void BuildUpdatePrompt(Transform parent)
+        {
+            _updateRoot = new GameObject("UpdatePrompt");
+            _updateRoot.transform.SetParent(parent, false);
+            Stretch(_updateRoot.AddComponent<RectTransform>());
+
+            var dim = CreateImage(_updateRoot.transform, "Dimmer", KebammVisualFactory.SquareSprite, new Color(0f, 0f, 0f, 0.7f));
+            Stretch(dim.rectTransform);
+            dim.raycastTarget = true;
+
+            var panel = CreateImage(_updateRoot.transform, "Panel", KebammVisualFactory.SquareSprite, SettingsFill);
+            Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(820f, 620f));
+
+            CreateLabel(_updateRoot.transform, "Title", "New game data available", 56f,
+                new Vector2(0f, 200f), new Vector2(760f, 90f), SettingsText).fontStyle = FontStyles.Bold;
+            _updateText = CreateLabel(_updateRoot.transform, "Version", "", 38f,
+                new Vector2(0f, 100f), new Vector2(760f, 60f), SettingsText);
+
+            CreateButton(_updateRoot.transform, "YesButton", "Yes", 46f, Color.white, StartGreen,
+                null, new Vector2(0f, -40f), 0f, new Vector2(560f, 120f), OnUpdateYes);
+            CreateButton(_updateRoot.transform, "NoButton", "No", 46f, Color.white, new Color(0.45f, 0.30f, 0.75f),
+                null, new Vector2(0f, -190f), 0f, new Vector2(560f, 120f), OnUpdateNo);
+
+            _updateRoot.SetActive(false);
+        }
+
+        /// <summary>Shows the update prompt if newer online data is waiting (main menu only).</summary>
+        public void ShowUpdatePrompt()
+        {
+            if (_updateRoot == null || !IsVisible || !KebammRemoteData.HasOffer)
+                return;
+            _updateText.text = KebammRemoteData.OfferText;
+            _updateRoot.SetActive(true);
+        }
+
+        void OnUpdateYes()
+        {
+            _updateRoot.SetActive(false);
+            if (KebammPrototypeBootstrap.Instance != null)
+                KebammPrototypeBootstrap.Instance.AcceptRemoteData();
+            RefreshDataLabel();
+        }
+
+        void OnUpdateNo()
+        {
+            _updateRoot.SetActive(false);
+            KebammRemoteData.DeclineOffer();
+        }
+
+        void RefreshDataLabel()
+        {
+            if (_dataLabel != null)
+                _dataLabel.text = KebammRemoteData.StatusText;
+        }
+
         public void Show()
         {
+            RefreshDataLabel();
+            if (_updateRoot != null)
+                _updateRoot.SetActive(false);
             if (_root != null)
                 _root.SetActive(true);
             if (_settingsRoot != null)
                 _settingsRoot.SetActive(false);
             RefreshLevel();
             StartIdleTweens();
+            ShowUpdatePrompt();
         }
 
         public void Hide()
         {
             KillTweens();
+            if (_updateRoot != null)
+                _updateRoot.SetActive(false);
             if (_settingsRoot != null)
                 _settingsRoot.SetActive(false);
             if (_root != null)

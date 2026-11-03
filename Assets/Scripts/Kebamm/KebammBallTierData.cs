@@ -75,6 +75,12 @@ namespace Kebamm
             return dataTier * 20;
         }
 
+        /// <summary>Drops the tier lookup so the next call re-reads (used when remote data is applied).</summary>
+        public static void ClearCache()
+        {
+            _byTier = null;
+        }
+
         static void Ensure()
         {
             if (_byTier != null)
@@ -86,7 +92,10 @@ namespace Kebamm
             {
                 KebammBallTierData row = rows[i];
                 if (row != null)
-                    _byTier[row.tier] = row;
+                {
+                    KebammBallTierData r = KebammRemoteData.ForBallTier(row); // remote override copy, or the asset
+                    _byTier[r.tier] = r;
+                }
             }
         }
     }
