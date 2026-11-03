@@ -261,7 +261,8 @@ namespace Kebamm
             var titleRect = titleGo.AddComponent<RectTransform>();
             Place(titleRect, new Vector2(0f, 640f), new Vector2(1000f, 240f));
 
-            const float letterHeight = 200f;
+            KebammGameManagerData gm = MenuGameManager();
+            float letterHeight = gm != null ? gm.TitleLetterHeight : 200f; // Game Manager "title letter height"
             const float overlap = 0.86f; // letters tuck into each other slightly, like the mockups
             var sprites = new Sprite[art.Length];
             var widths = new float[art.Length];
@@ -313,15 +314,17 @@ namespace Kebamm
             KillTweens();
             ResetRestPoses();
 
-            // Title: one-time gentle pop in, then a small wave bob.
+            // Title: one-time gentle pop in, then a small wave bob (Game Manager "title breath duration").
             if (_letters != null)
             {
+                KebammGameManagerData gm = MenuGameManager();
+                float breath = gm != null ? gm.TitleBreathDuration : 1.1f;
                 for (int i = 0; i < _letters.Length; i++)
                 {
                     var l = _letters[i];
                     l.localScale = Vector3.one * 0.6f;
                     l.DOScale(1f, 0.35f).SetDelay(0.06f * i).SetEase(Ease.OutBack).SetId(this).SetLink(l.gameObject);
-                    l.DOAnchorPosY(_letterRest[i].y + 8f, 1.1f).SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
+                    l.DOAnchorPosY(_letterRest[i].y + 8f, breath).SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
                         .SetDelay(0.4f + 0.12f * i).SetId(this).SetLink(l.gameObject);
                 }
             }
@@ -379,6 +382,12 @@ namespace Kebamm
                     if (_bubbles[i] != null) _bubbles[i].anchoredPosition = _bubbleRest[i];
                     if (_bubbleShadows[i] != null) _bubbleShadows[i].localScale = Vector3.one;
                 }
+        }
+
+        static KebammGameManagerData MenuGameManager()
+        {
+            var boot = KebammPrototypeBootstrap.Instance;
+            return boot != null ? boot.GameManagerData : null;
         }
 
         void KillTweens()

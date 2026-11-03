@@ -10,7 +10,8 @@ namespace Kebamm
 {
     /// <summary>
     /// Developer cheat console (GDD: Debug Console). Backquote opens/closes on desktop/Editor,
-    /// triple-tap the top-left corner on mobile. Compiled only in the Editor and development builds.
+    /// triple-tap the top-left corner on mobile (corner measured from the safe area, at least 12 mm or 160 px).
+    /// Compiled only in the Editor and development builds.
     /// Commands: jump N, next, prev, restart, win, help.
     /// </summary>
     public class KebammDebugConsole : MonoBehaviour
@@ -18,7 +19,8 @@ namespace Kebamm
         const float PanelHeight = 300f;
         const float SlideDuration = 0.22f;
         const int MaxLines = 5;
-        const float CornerPixels = 160f;
+        const float CornerPixels = 160f;   // minimum corner size
+        const float CornerMillimetres = 12f;
         const float TripleTapWindow = 0.6f;
 
         RectTransform _panel;
@@ -155,7 +157,10 @@ namespace Kebamm
             if (ts != null && ts.primaryTouch.press.wasPressedThisFrame)
             {
                 Vector2 pos = ts.primaryTouch.position.ReadValue();
-                if (pos.x <= CornerPixels && pos.y >= Screen.height - CornerPixels)
+                // Corner from the safe area's top-left (clear of notch / status bar), sized by screen density.
+                Rect safe = Screen.safeArea;
+                float corner = Screen.dpi > 0f ? Mathf.Max(CornerPixels, Screen.dpi * CornerMillimetres / 25.4f) : CornerPixels;
+                if (pos.x <= safe.xMin + corner && pos.y >= safe.yMax - corner)
                 {
                     float now = Time.unscaledTime;
                     if (now - _lastTapTime > TripleTapWindow)

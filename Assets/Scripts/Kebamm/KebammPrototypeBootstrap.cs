@@ -201,6 +201,8 @@ namespace Kebamm
         }
 
         KebammGameManagerData _gameManager;
+        /// <summary>Active Game Manager data (remote override copy or the asset); null if missing.</summary>
+        public KebammGameManagerData GameManagerData => _gameManager;
         bool _layoutDirty;
 
         void LoadGameManager()
@@ -214,6 +216,8 @@ namespace Kebamm
             ContainerWidth = _gameManager.PillarGapWidth;
             ContainerHeight = _gameManager.PillarHeight;
             CapsLineHeight = _gameManager.CapsLineHeight;
+            // Jar floor top sits a fixed distance above the platform (ground) top; the ground never moves.
+            ContainerFloorY = (MonsterY - 1f) + GroundThickness * 0.5f + _gameManager.JarToPlatformDistance;
         }
 
         void OnEnable() { KebammGameManagerData.Changed += OnGameManagerChanged; KebammRemoteData.OfferReady += OnRemoteDataOffer; }
@@ -237,12 +241,13 @@ namespace Kebamm
         /// <summary>Live re-layout from Game Manager data: walls, floor, cap line/band and launcher height + clamp.</summary>
         void ApplyLayout()
         {
+            _container.SetFloorTop(ContainerFloorY);
             _container.Layout(ContainerWidth, ContainerHeight, WallThickness, CapsLineHeight);
             if (_capacity != null)
                 _capacity.SetBand(_container.CapacityY, ContainerWidth * 0.95f);
             if (_dropper != null)
                 _dropper.DropY = _container.TopY + 0.35f;
-            Debug.Log($"[Kebamm] Game Manager layout: pillar height {ContainerHeight}, gap {ContainerWidth}, caps line {CapsLineHeight}");
+            Debug.Log($"[Kebamm] Game Manager layout: pillar height {ContainerHeight}, gap {ContainerWidth}, caps line {CapsLineHeight}, jar floor y {ContainerFloorY}");
         }
 
         void BuildWorld()

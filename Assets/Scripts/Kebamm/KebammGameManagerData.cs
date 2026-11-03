@@ -21,6 +21,14 @@ namespace Kebamm
         public float pillarGapWidth = 5.0f;
         [Tooltip("Max caps (red) line height in world units, measured up from the container floor top.")]
         public float capsLineHeight = 4.95f;
+        [Tooltip("Distance in world units from the platform (ground) top up to the jar's inner floor top. The jar moves; the ground stays fixed. Applied live.")]
+        public float jarToPlatformDistance = 3.525f;
+
+        [Header("Main Menu Title")]
+        [Tooltip("Seconds for one half (up or down) of the title letters' repeated breathing bob. Applied each time the main menu is shown.")]
+        public float titleBreathDuration = 1.1f;
+        [Tooltip("Title letter image height in reference pixels (1080x1920 canvas); the title still shrinks to fit 980 px wide. Applied when the menu is built (app launch).")]
+        public float titleLetterHeight = 200f;
 
         [Header("Remote Data")]
         [Tooltip("URL of kebamm_data.json (raw Gist link). Empty = no online fetch; cached or built-in data is used.")]
@@ -34,6 +42,9 @@ namespace Kebamm
         public float PillarHeight => Mathf.Max(MinPillarHeight, pillarHeight);
         public float PillarGapWidth => Mathf.Max(MinPillarGapWidth, pillarGapWidth);
         public float CapsLineHeight => Mathf.Max(MinCapsLineHeight, capsLineHeight);
+        public float JarToPlatformDistance => Mathf.Max(0.5f, jarToPlatformDistance);
+        public float TitleBreathDuration => Mathf.Max(0.1f, titleBreathDuration);
+        public float TitleLetterHeight => Mathf.Max(10f, titleLetterHeight);
 
         void OnValidate()
         {

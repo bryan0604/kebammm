@@ -68,6 +68,9 @@ namespace Kebamm
             IsOpen = false;
         }
 
+        /// <summary>Moves the inner floor top (world y); takes effect on the next Layout call.</summary>
+        public void SetFloorTop(float floorTopY) { _floorTopY = floorTopY; }
+
         /// <summary>Re-sizes/positions walls (colliders + art), floor and cap line. Safe to call live; the floor top stays put.</summary>
         public void Layout(float width, float height, float wallThickness, float capsLineHeight)
         {

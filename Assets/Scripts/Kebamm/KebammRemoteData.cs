@@ -305,6 +305,9 @@ namespace Kebamm
             SetFloat(row, "pillar_height", "GameManager", "pillarHeight", ref g.pillarHeight);
             SetFloat(row, "pillar_gap_width", "GameManager", "pillarGapWidth", ref g.pillarGapWidth);
             SetFloat(row, "caps_line_height", "GameManager", "capsLineHeight", ref g.capsLineHeight);
+            SetFloat(row, "jar_to_platform_distance", "GameManager", "jarToPlatformDistance", ref g.jarToPlatformDistance);
+            SetFloat(row, "title_breath_duration", "GameManager", "titleBreathDuration", ref g.titleBreathDuration);
+            SetFloat(row, "title_letter_height", "GameManager", "titleLetterHeight", ref g.titleLetterHeight);
             return g;
         }
 
