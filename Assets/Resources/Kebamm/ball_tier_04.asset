@@ -15,6 +15,6 @@ MonoBehaviour:
   tier: 4
   damage: 200
   hp: 1
-  mergePts: 80
+  mergePts: 190
   impactStrength: 10
-  ballSize: 2.4
+  ballSize: 1.4
