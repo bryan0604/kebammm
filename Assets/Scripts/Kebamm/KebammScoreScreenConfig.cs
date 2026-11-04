@@ -24,8 +24,9 @@ namespace Kebamm
         public float starPopDuration = 0.35f;
         public float starPopStagger = 0.18f;
 
-        // GDD (Scores): 1 star for 1 monster killed, 2 stars for 3, 3 stars for 5. Applies to every level.
-        [Header("Stars (monsters killed this session)")]
+        // UNUSED since 4 Nov 2026: stars now come from killed / total monsters vs the Game Manager thresholds
+        // (star_1/2/3_threshold, KebammGameManagerData.StarsFor). Kept so existing assets still load.
+        [Header("Stars (legacy kill counts - unused)")]
         [Tooltip("Monsters killed needed for 1 star.")] public int star1Kills = 1;
         [Tooltip("Monsters killed needed for 2 stars.")] public int star2Kills = 3;
         [Tooltip("Monsters killed needed for 3 stars.")] public int star3Kills = 5;

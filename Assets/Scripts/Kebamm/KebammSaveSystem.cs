@@ -36,6 +36,7 @@ namespace Kebamm
         public int level;
         public int bestStars;
         public int bestScore;
+        public int attempts; // score screens reached on this level (analytics attempt counter)
     }
 
     [Serializable]
@@ -225,6 +226,15 @@ namespace Kebamm
             Debug.Log($"{LogTag} Level {level} result: stars {stars} (best {oldStars} -> {l.bestStars}), score {score} (best {oldScore} -> {l.bestScore}), highest unlocked {pr.highestLevelUnlocked}, last played {pr.lastLevelPlayed}");
             Save();
             Debug.Log($"{LogTag} Saved to disk at score screen (level {level}).");
+        }
+
+        /// <summary>Analytics: counts one more attempt on this level (score screen reached) and returns it (1 = first).</summary>
+        public static int NextAttempt(int level)
+        {
+            var l = GetLevel(level, true);
+            l.attempts++;
+            Save();
+            return l.attempts;
         }
 
         public static void SetLastPlayed(int level)

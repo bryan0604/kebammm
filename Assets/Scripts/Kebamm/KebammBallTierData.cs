@@ -16,6 +16,9 @@ namespace Kebamm
         public float ballSize;
 
         static Dictionary<int, KebammBallTierData> _byTier;
+        // Built-in fallbacks when a tier row is missing (Notion Ball Tier Data v14).
+        static readonly float[] DefaultDamage = { 50f, 100f, 150f, 200f, 250f };
+        static readonly int[] DefaultMergePtsByTier = { 20, 40, 80, 190, 380 };
 
         public static void Resolve(int playTier, out float damage, out float hp)
         {
@@ -40,7 +43,7 @@ namespace Kebamm
                 return;
             }
 
-            damage = dataTier * 10f;
+            damage = DefaultDamage[dataTier - 1];
             hp = 1f;
             mergePts = DefaultMergePts(dataTier);
         }
@@ -72,7 +75,7 @@ namespace Kebamm
         public static int DefaultMergePts(int dataTier)
         {
             dataTier = Mathf.Clamp(dataTier, 1, 5);
-            return dataTier * 20;
+            return DefaultMergePtsByTier[dataTier - 1];
         }
 
         /// <summary>Drops the tier lookup so the next call re-reads (used when remote data is applied).</summary>

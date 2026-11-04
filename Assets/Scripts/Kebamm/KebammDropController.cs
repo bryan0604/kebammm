@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -50,6 +51,7 @@ namespace Kebamm
             bool allowDrop = _canDrop && !_container.IsOpen;
             if (_preview != null && _preview.gameObject.activeSelf != allowDrop)
                 _preview.gameObject.SetActive(allowDrop);
+            UpdateBombIndicator();
 
             if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked || KebammPrototypeBootstrap.IsPaused)
             {
@@ -85,6 +87,7 @@ namespace Kebamm
                 dropPressed = true;
 
             FollowTarget();
+            UpdateBombIndicator();
 
             if (dropPressed && _cooldownLeft <= 0f)
                 Drop();
@@ -239,6 +242,8 @@ namespace Kebamm
             // GameObject in the same frame (removes one create + one destroy per drop).
             var held = _preview;
             _preview = null;
+            if (!held.IsBomb)
+                KebammCombo.OnBallDropped(); // new combo window; a Magic Bomb drop is not a drop for combo
             held.transform.position = new Vector3(held.transform.position.x, DropY, 0f);
             _bootstrap.ReleasePreview(held);
             _cooldownLeft = DropCooldown;
@@ -251,13 +256,91 @@ namespace Kebamm
                 Destroy(_preview.gameObject);
 
             // The held ball shows the next colour and tier ahead of the drop; it is re-rolled after each drop.
-            var colour = _bootstrap.NextQueuedColour();
-            int tier = _bootstrap.NextQueuedTier();
-            _preview = _bootstrap.SpawnBall(new Vector3(0f, DropY, 0f), colour, tier, preview: true);
+            // A queued Magic Bomb comes right after the ball that was already held (GDD Combo Gameplay Design).
+            if (KebammCombo.TryTakeBomb())
+            {
+                _preview = _bootstrap.SpawnBomb(new Vector3(0f, DropY, 0f), preview: true);
+                Debug.Log($"[Kebamm] Magic Bomb loaded in the launcher ({KebammCombo.QueuedBombs} more queued)");
+            }
+            else
+            {
+                var colour = _bootstrap.NextQueuedColour();
+                int tier = _bootstrap.NextQueuedTier();
+                _preview = _bootstrap.SpawnBall(new Vector3(0f, DropY, 0f), colour, tier, preview: true);
+            }
             if (_preview != null)
                 UpdateAim();
             if (_preview != null)
                 _preview.gameObject.SetActive(_canDrop && !_container.IsOpen);
+        }
+
+        // ---- Magic Bomb count indicator (placeholder: black circle + "xN" beside the launcher) ----------------
+        GameObject _bombIndicator;
+        TextMeshPro _bombCountText;
+        int _shownBombCount = -1;
+
+        void EnsureBombIndicator()
+        {
+            if (_bombIndicator != null)
+                return;
+            float icon = Mathf.Max(0.05f, KebammCombo.Config.indicatorIconSize);
+            _bombIndicator = new GameObject("MagicBombIndicator");
+            _bombIndicator.transform.SetParent(transform, false);
+            var iconGo = new GameObject("Icon");
+            iconGo.transform.SetParent(_bombIndicator.transform, false);
+            iconGo.transform.localScale = Vector3.one * icon;
+            var sr = iconGo.AddComponent<SpriteRenderer>();
+            sr.sprite = KebammVisualFactory.CircleSprite;
+            sr.color = Color.black;
+            sr.sortingOrder = 40;
+            var textGo = new GameObject("Count");
+            textGo.transform.SetParent(_bombIndicator.transform, false);
+            textGo.transform.localPosition = new Vector3(icon * 0.5f + 0.05f, 0f, 0f);
+            _bombCountText = textGo.AddComponent<TextMeshPro>();
+            _bombCountText.alignment = TextAlignmentOptions.Left;
+            _bombCountText.fontSize = 36f;
+            _bombCountText.color = Color.white;
+            _bombCountText.textWrappingMode = TextWrappingModes.NoWrap;
+            _bombCountText.overflowMode = TextOverflowModes.Overflow;
+            _bombCountText.rectTransform.pivot = new Vector2(0f, 0.5f);
+            _bombCountText.rectTransform.sizeDelta = new Vector2(6f, 1.5f);
+            TMP_FontAsset font = KebammDamageNumber.GetFont();
+            if (font != null)
+                _bombCountText.font = font;
+            var mr = _bombCountText.GetComponent<MeshRenderer>();
+            if (mr != null)
+                mr.sortingOrder = 41;
+            textGo.transform.localScale = Vector3.one * 0.07f;
+            _bombIndicator.SetActive(false);
+        }
+
+        /// <summary>Shows queued Magic Bombs beside the held ball; hidden when none are queued or the launcher is hidden.</summary>
+        void UpdateBombIndicator()
+        {
+            int count = KebammCombo.QueuedBombs;
+            bool show = count > 0 && _preview != null && _preview.gameObject.activeSelf;
+            if (!show)
+            {
+                if (_bombIndicator != null && _bombIndicator.activeSelf)
+                    _bombIndicator.SetActive(false);
+                return;
+            }
+            EnsureBombIndicator();
+            if (!_bombIndicator.activeSelf)
+                _bombIndicator.SetActive(true);
+            if (count != _shownBombCount)
+            {
+                _bombCountText.text = "x" + count;
+                _shownBombCount = count;
+            }
+            // Right of the held ball; flips to the left near the right pillar.
+            float icon = Mathf.Max(0.05f, KebammCombo.Config.indicatorIconSize);
+            float gap = _preview.Radius + icon * 0.5f + 0.12f;
+            float width = icon + 0.6f;
+            Vector3 p = _preview.transform.position;
+            float right = _container.transform.position.x + _container.InnerHalfWidth;
+            float x = p.x + gap + width <= right + 0.4f ? p.x + gap : p.x - gap - width + icon;
+            _bombIndicator.transform.position = new Vector3(x, p.y, 0f);
         }
 
         public void ClearPreview()

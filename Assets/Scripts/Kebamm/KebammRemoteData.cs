@@ -334,9 +334,38 @@ namespace Kebamm
             SetFloat(row, "title_pulse_duration", "GameManager", "titlePulseDuration", ref g.titlePulseDuration);
             SetFloat(row, "title_pulse_interval", "GameManager", "titlePulseInterval", ref g.titlePulseInterval);
             SetFloat(row, "debug_console_hold_seconds", "GameManager", "debugConsoleHoldSeconds", ref g.debugConsoleHoldSeconds);
+            SetFloat(row, "star_1_threshold", "GameManager", "star1Threshold", ref g.star1Threshold);
+            SetFloat(row, "star_2_threshold", "GameManager", "star2Threshold", ref g.star2Threshold);
+            SetFloat(row, "star_3_threshold", "GameManager", "star3Threshold", ref g.star3Threshold);
+            SetFloat(row, "bomb_touch_delay", "GameManager", "bombTouchDelay", ref g.bombTouchDelay);
+            SetFloat(row, "bomb_explode_range", "GameManager", "bombExplodeRange", ref g.bombExplodeRange);
+            SetInt(row, "bomb_explode_damage", "GameManager", "bombExplodeDamage", ref g.bombExplodeDamage);
+            SetInt(row, "bomb_explode_strength", "GameManager", "bombExplodeStrength", ref g.bombExplodeStrength);
             if (row.ContainsKey("debug_console_hold_seconds"))
                 Debug.Log("[KebammRemoteData] debug_console_hold_seconds=" + g.debugConsoleHoldSeconds.ToString(CultureInfo.InvariantCulture));
             return g;
+        }
+
+        /// <summary>Combo Points override: table comboPointsData, rows combo_N { combo_count, combo_points } (Notion Combo Points).</summary>
+        public static KebammComboConfig ForComboConfig(KebammComboConfig asset)
+        {
+            if (asset == null || _applied == null || !_applied.TryGetValue("comboPointsData", out object t) || !(t is Dictionary<string, object> rows))
+                return asset;
+            if (_copies.TryGetValue(asset, out var done) && done != null) return (KebammComboConfig)done;
+            var c = CopyOf(asset);
+            c.comboPoints = new List<int>(c.comboPoints ?? new List<int>());
+            foreach (var kv in rows)
+            {
+                if (!(kv.Value is Dictionary<string, object> row)) continue;
+                if (!(row.TryGetValue("combo_count", out object cv) && cv is double cd) || cd < 1 || Math.Abs(cd - Math.Round(cd)) > 1e-6)
+                { Debug.LogWarning($"{LogTag} comboPointsData.{kv.Key} has no whole combo_count >= 1; skipped."); continue; }
+                int index = (int)Math.Round(cd) - 1;
+                while (c.comboPoints.Count <= index) c.comboPoints.Add(0);
+                int pts = c.comboPoints[index];
+                SetInt(row, "combo_points", "combo_config", "comboPoints[" + index + "]", ref pts);
+                c.comboPoints[index] = pts;
+            }
+            return c;
         }
 
         // ---- field setters (log every change) ---------------------------------------------------

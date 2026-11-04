@@ -28,5 +28,12 @@ MonoBehaviour:
   titlePulseDuration: 0.35
   debugConsoleHoldSeconds: 5
   titlePulseInterval: 5
+  star1Threshold: 0.2
+  star2Threshold: 0.6
+  star3Threshold: 0.85
+  bombTouchDelay: 1.2
+  bombExplodeRange: 8
+  bombExplodeDamage: 10
+  bombExplodeStrength: 3
   remoteDataUrl: https://gist.githubusercontent.com/bryan0604/e5d81b25e0da4571a131483f506f1b97/raw/kebamm_data.json
   remoteDataTimeoutSeconds: 5

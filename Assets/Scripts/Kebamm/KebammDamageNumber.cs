@@ -58,7 +58,7 @@ namespace Kebamm
             });
         }
 
-        static TMP_FontAsset GetFont()
+        internal static TMP_FontAsset GetFont()
         {
             // Only try once: CreateFontAsset fails on this setup ("Unable to load font face for [LegacyRuntime]")
             // and returns null, so without this flag it was retried (and warned, with a stack trace) on every call.

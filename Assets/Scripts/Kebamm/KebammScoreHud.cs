@@ -56,11 +56,79 @@ namespace Kebamm
         void OnEnable()
         {
             KebammScore.Changed += Refresh;
+            KebammCombo.Changed += RefreshCombo;
+            KebammCombo.BarFilled += PulseComboBar;
         }
 
         void OnDisable()
         {
             KebammScore.Changed -= Refresh;
+            KebammCombo.Changed -= RefreshCombo;
+            KebammCombo.BarFilled -= PulseComboBar;
+        }
+
+        // ---- Combo bar (placeholder, top left; GDD Combo Gameplay Design) -------------------------------
+        RectTransform _comboBar;
+        RectTransform _comboFill;
+        TextMeshProUGUI _comboLabel;
+        const float ComboBarWidth = 260f;
+        const float ComboBarHeight = 30f;
+
+        void BuildComboBar(Transform parent)
+        {
+            var root = new GameObject("ComboBar");
+            root.transform.SetParent(parent, false);
+            _comboBar = root.AddComponent<RectTransform>();
+            _comboBar.anchorMin = _comboBar.anchorMax = new Vector2(0f, 1f);
+            _comboBar.pivot = new Vector2(0f, 1f);
+            _comboBar.anchoredPosition = new Vector2(30f, -40f);
+            _comboBar.sizeDelta = new Vector2(ComboBarWidth, ComboBarHeight);
+            var bg = root.AddComponent<Image>();
+            bg.sprite = KebammVisualFactory.SquareSprite;
+            bg.color = new Color(0f, 0f, 0f, 0.55f);
+            bg.raycastTarget = false;
+
+            var fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(root.transform, false);
+            _comboFill = fillGo.AddComponent<RectTransform>();
+            _comboFill.anchorMin = new Vector2(0f, 0f);
+            _comboFill.anchorMax = new Vector2(0f, 1f);
+            _comboFill.pivot = new Vector2(0f, 0.5f);
+            _comboFill.offsetMin = new Vector2(3f, 3f);
+            _comboFill.offsetMax = new Vector2(3f, -3f);
+            var fill = fillGo.AddComponent<Image>();
+            fill.sprite = KebammVisualFactory.SquareSprite;
+            fill.color = new Color(1f, 0.78f, 0.15f, 1f);
+            fill.raycastTarget = false;
+
+            _comboLabel = CreateLabel(root.transform, "ComboLabel", "Combo 0/100", 22f,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(ComboBarWidth, ComboBarHeight));
+            RefreshCombo();
+        }
+
+        void RefreshCombo()
+        {
+            if (_comboFill == null)
+                return;
+            int cap = KebammCombo.Config.BarCapacity;
+            float t = Mathf.Clamp01((float)KebammCombo.BarPoints / cap);
+            _comboFill.sizeDelta = new Vector2((ComboBarWidth - 6f) * t, _comboFill.sizeDelta.y);
+            if (_comboLabel != null)
+                _comboLabel.text = $"Combo {KebammCombo.BarPoints}/{cap}";
+        }
+
+        void PulseComboBar(int fills)
+        {
+            if (_comboBar == null)
+                return;
+            KebammComboConfig cfg = KebammCombo.Config;
+            _comboBar.DOKill();
+            _comboBar.localScale = Vector3.one;
+            _comboBar.DOScale(Mathf.Max(1f, cfg.barPulseScale), Mathf.Max(0.02f, cfg.barPulseDuration))
+                .SetLoops(Mathf.Max(1, cfg.barPulseCount) * 2, LoopType.Yoyo)
+                .SetEase(Ease.OutQuad)
+                .SetLink(_comboBar.gameObject)
+                .OnComplete(() => { if (_comboBar != null) _comboBar.localScale = Vector3.one; });
         }
 
         public void Build()
@@ -83,6 +151,7 @@ namespace Kebamm
                 new Vector2(0.5f, 1f), new Vector2(0f, -72f), new Vector2(960f, 64f));
             _levelValue = CreateLabel(canvasGo.transform, "LevelHud", "Level 1", 34f,
                 new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(960f, 56f));
+            BuildComboBar(canvasGo.transform);
 
             _endRoot = new GameObject("EndScreen");
             _endRoot.transform.SetParent(canvasGo.transform, false);
@@ -212,16 +281,44 @@ namespace Kebamm
 
         // GDD cue: Score Screen > 1s > Scores Numbers (Merge Score, Monster Score) > 1s > 3 Stars Logics > 2s > Next Button.
         // Timings come from KebammScoreScreenConfig; each delay counts from the previous step.
+        /// <summary>
+        /// GDD Game Result - Stars: killed / total monsters vs Game Manager thresholds (default 20% / 60% / 85%).
+        /// Used for the score screen, the save and the Level Results row (debug console win goes through here too).
+        /// </summary>
+        static int CalculateStars(KebammPrototypeBootstrap boot)
+        {
+            int killed = KebammScore.MonstersDestroyed;
+            int total = boot != null ? boot.MonstersInLevel : 0;
+            var gm = boot != null ? boot.GameManagerData : null;
+            if (gm == null)
+                gm = Resources.Load<KebammGameManagerData>("Kebamm/GameManager");
+            if (gm == null)
+                gm = ScriptableObject.CreateInstance<KebammGameManagerData>();
+            if (total <= 0)
+            {
+                Debug.LogWarning("[Kebamm] Stars earned: 0 (level has 0 monsters - nothing to kill, no stars)");
+                return 0;
+            }
+            int earned = gm.StarsFor(killed, total);
+            float pct = 100f * killed / total;
+            Debug.Log($"[Kebamm] Stars earned: {earned} (killed {killed}/{total} = {pct:0.#}%; thresholds 1:{gm.Star1Threshold * 100f:0.#}% 2:{gm.Star2Threshold * 100f:0.#}% 3:{gm.Star3Threshold * 100f:0.#}%)");
+            return earned;
+        }
+
         void PlayEndSequence()
         {
             KillEndSequence();
             KebammScoreScreenConfig config = KebammScoreScreenConfig.Load();
-            int earned = config.StarsForKills(KebammScore.MonstersDestroyed);
-            Debug.Log($"[Kebamm] Stars earned: {earned} (monsters destroyed {KebammScore.MonstersDestroyed})");
             // Save at score-screen display time (stars are final here; the animation only shows them).
             var boot = KebammPrototypeBootstrap.Instance;
+            int earned = CalculateStars(boot);
             if (boot != null)
+            {
+                bool debugWin = KebammSaveSystem.SkipNextResult;
                 KebammSaveSystem.RecordResult(boot.CurrentLevelNumber, earned, KebammScore.FinalScore, boot.NextLevelNumber);
+                if (!debugWin)
+                    KebammLevelResults.Record(boot.CurrentLevelNumber, earned);
+            }
 
             SetScoreNumbersVisible(false);
             if (_nextButton != null)

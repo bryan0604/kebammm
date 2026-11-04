@@ -55,6 +55,23 @@ namespace Kebamm
 
         [Tooltip("Seconds of rest between title pulses (Notion title_pulse_interval). 0 = continuous.")]
         public float titlePulseInterval = 5f;
+
+        [Header("Game Result - Stars (GDD: killed / total monsters)")]
+        [Tooltip("Fraction of the level's monsters killed for 1 star (Notion star_1_threshold). 0.20 = 20%.")]
+        [Range(0f, 1f)] public float star1Threshold = 0.20f;
+        [Tooltip("Fraction of the level's monsters killed for 2 stars (Notion star_2_threshold). Never below 1 star.")]
+        [Range(0f, 1f)] public float star2Threshold = 0.60f;
+        [Tooltip("Fraction of the level's monsters killed for 3 stars (Notion star_3_threshold). Never below 2 stars.")]
+        [Range(0f, 1f)] public float star3Threshold = 0.85f;
+        [Header("Magic Bomb (GDD Combo Gameplay Design)")]
+        [Tooltip("Seconds from the bomb's first touch in the jar (wall, base or ball) to the explosion (Notion bomb_touch_delay).")]
+        public float bombTouchDelay = 1.2f;
+        [Tooltip("Explosion radius in world units (Notion bomb_explode_range).")]
+        public float bombExplodeRange = 8f;
+        [Tooltip("Damage to every ball in range: ball health - damage, 0 or less = destroyed (Notion bomb_explode_damage).")]
+        public int bombExplodeDamage = 10;
+        [Tooltip("Impulse pushing surviving balls away from the bomb (Notion bomb_explode_strength).")]
+        public int bombExplodeStrength = 3;
         [Header("Remote Data")]
         [Tooltip("URL of kebamm_data.json (raw Gist link). Empty = no online fetch; cached or built-in data is used.")]
         public string remoteDataUrl = "";
@@ -79,6 +96,29 @@ namespace Kebamm
         public float TitlePulseScale => Mathf.Max(0.1f, titlePulseScale);
         public float TitlePulseDuration => Mathf.Max(0.05f, titlePulseDuration);
         public float TitlePulseInterval => Mathf.Max(0f, titlePulseInterval);
+        public float BombTouchDelay => Mathf.Max(0f, bombTouchDelay);
+        public float BombExplodeRange => Mathf.Max(0f, bombExplodeRange);
+        public int BombExplodeDamage => Mathf.Max(0, bombExplodeDamage);
+        public int BombExplodeStrength => Mathf.Max(0, bombExplodeStrength);
+        public float Star1Threshold => Mathf.Clamp01(star1Threshold);
+        public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));
+        public float Star3Threshold => Mathf.Max(Star2Threshold, Mathf.Clamp01(star3Threshold));
+
+        /// <summary>
+        /// GDD Game Result - Stars: killed / total >= threshold (no rounding). 0 monsters in the level = 0 stars
+        /// (nothing to kill; logged as a warning by the caller).
+        /// </summary>
+        public int StarsFor(int killed, int total)
+        {
+            if (total <= 0)
+                return 0;
+            float ratio = (float)killed / total;
+            if (ratio >= Star3Threshold) return 3;
+            if (ratio >= Star2Threshold) return 2;
+            if (ratio >= Star1Threshold) return 1;
+            return 0;
+        }
+
         public float DebugConsoleHoldSeconds => debugConsoleHoldSeconds > 0f ? debugConsoleHoldSeconds : 5f;
 
         void OnValidate()

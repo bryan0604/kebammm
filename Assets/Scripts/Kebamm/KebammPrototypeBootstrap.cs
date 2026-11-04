@@ -246,6 +246,8 @@ namespace Kebamm
             if (InMainMenu || IsPaused)
                 return;
 
+            KebammScore.Tick(Time.unscaledDeltaTime);
+
             var kb = UnityEngine.InputSystem.Keyboard.current;
             if (!GameplayInputBlocked && kb != null && kb.rKey.wasPressedThisFrame)
                 ResetSession();
@@ -304,6 +306,9 @@ namespace Kebamm
         KebammGameManagerData _gameManager;
         /// <summary>Active Game Manager data (remote override copy or the asset); null if missing.</summary>
         public KebammGameManagerData GameManagerData => _gameManager;
+        public KebammContainer Container => _container;
+        /// <summary>Monsters spawned in the current level (stars: killed / total).</summary>
+        public int MonstersInLevel => _monsters.Count;
         bool _layoutDirty;
 
         void LoadGameManager()
@@ -794,7 +799,7 @@ namespace Kebamm
         static KebammMonsterData[] CreateFallbackMonsters()
         {
             int[] ids = { 0, 1, 2 };
-            float[] hps = { 100f, 200f, 500f }; // Notion Monster Tier Data hp
+            float[] hps = { 70f, 150f, 350f }; // Notion Monster Tier Data hp (v14)
             int[] tiers = { 1, 2, 3 };
             int[] hitPts = { 13, 26, 52 };
             int[] destroyedPts = { 250, 500, 1000 };
@@ -866,6 +871,20 @@ namespace Kebamm
             return ball;
         }
 
+        /// <summary>Spawns a Magic Bomb (held in the launcher when preview is true).</summary>
+        public KebammBall SpawnBomb(Vector3 position, bool preview)
+        {
+            var go = new GameObject(preview ? "PreviewBomb" : "MagicBomb");
+            go.transform.SetParent(preview ? _dropper.transform : _ballsRoot, true);
+            go.transform.position = position;
+            go.AddComponent<SpriteRenderer>();
+            go.AddComponent<CircleCollider2D>();
+            go.AddComponent<Rigidbody2D>();
+            var ball = go.AddComponent<KebammBall>();
+            ball.ConfigureBomb(preview);
+            return ball;
+        }
+
         /// <summary>
         /// Turns the held preview ball into a live ball in place (same object, no destroy/re-create),
         /// exactly as SpawnBall(position, colour, tier, preview: false) would configure it.
@@ -875,9 +894,18 @@ namespace Kebamm
             if (preview == null)
                 return null;
             preview.transform.SetParent(_ballsRoot, true);
+            if (preview.IsBomb)
+            {
+                // Magic Bomb: AOE only. Not counted in ball tiers (Level Results) or as a combo drop.
+                preview.ConfigureBomb(preview: false);
+                ResetBombingIdleTimer();
+                Debug.Log($"[Kebamm] Magic Bomb dropped at x={preview.transform.position.x:0.00}");
+                return preview;
+            }
             preview.Configure(preview.Colour, preview.Tier, preview: false);
             ResetBombingIdleTimer();
             KebammFrameSpikeLog.Drops++;
+            KebammScore.CountBall(preview.Tier);
             return preview;
         }
 
@@ -891,8 +919,10 @@ namespace Kebamm
                 rb.linearVelocity = Vector2.zero;
             _capacity?.NotifyMerge(ball, inPlay);
             KebammFrameSpikeLog.Merges++;
+            KebammScore.CountBall(tier);
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
             KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
+            KebammCombo.OnMerge(position);
         }
 
         public void SetDroppingEnabled(bool enabled)
@@ -1045,6 +1075,7 @@ namespace Kebamm
                 return;
             if (!KebammRemoteData.CommitPending())
                 return;
+            KebammCombo.Reload(); // combo points copy was destroyed by CommitPending
             int index = _levelIndex;
             int number = CurrentLevelNumber;
             LoadLevels();
@@ -1076,6 +1107,7 @@ namespace Kebamm
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.HideEnd();
             KebammScore.ResetScores();
+            KebammCombo.ResetAttempt(); // combo bar, count and bomb queue are per level attempt
 
             if (_ballsRoot != null)
             {

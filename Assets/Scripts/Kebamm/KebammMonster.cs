@@ -272,7 +272,7 @@ namespace Kebamm
                 return;
 
             var ball = collision.collider.GetComponent<KebammBall>();
-            if (ball == null || ball.IsPreview)
+            if (ball == null || ball.IsPreview || ball.IsBomb) // Magic Bomb: no impact damage
                 return;
 
             float ballDamage = ball.Damage;

@@ -17,6 +17,8 @@ namespace Kebamm
         public float Damage { get; private set; }
         public float Health { get; private set; }
         public float ImpactStrength { get; private set; }
+        /// <summary>Magic Bomb (combo power-up): never merges, deals no impact damage, explodes via KebammMagicBomb.</summary>
+        public bool IsBomb { get; private set; }
 
         Rigidbody2D _rb;
         CircleCollider2D _col;
@@ -38,7 +40,7 @@ namespace Kebamm
             _registered = false;
         }
 
-        public float Radius => KebammBallTierData.DiameterForPlayTier(Tier) * 0.5f;
+        public float Radius => IsBomb ? Mathf.Max(0.05f, KebammCombo.Config.bombDiameter) * 0.5f : KebammBallTierData.DiameterForPlayTier(Tier) * 0.5f;
 
         // Merge: the merged ball appears at the midpoint of the two balls and grows from the pre-merge size
         // to the new tier size, so physics pushes neighbours aside gradually.
@@ -98,6 +100,24 @@ namespace Kebamm
             }
 
             name = $"Ball_{colour}_T{Tier}";
+        }
+
+        /// <summary>Configures this ball as a Magic Bomb (black placeholder circle, bomb diameter). Live bombs get KebammMagicBomb.</summary>
+        public void ConfigureBomb(bool preview)
+        {
+            IsBomb = true;
+            Configure(KebammBallColour.Red, 0, preview);
+            if (_registered)
+            {
+                Live.Remove(this); // not a jar ball for the capacity line
+                _registered = false;
+            }
+            _sr.sprite = KebammVisualFactory.CircleSprite;
+            _sr.color = Color.black;
+            _sr.sortingOrder = 20;
+            name = preview ? "MagicBomb_Held" : "MagicBomb";
+            if (!preview && GetComponent<KebammMagicBomb>() == null)
+                gameObject.AddComponent<KebammMagicBomb>();
         }
 
 
@@ -214,10 +234,10 @@ namespace Kebamm
             // Touching another still-falling ball does not count (spam-drop bombing bug).
             if (!collision.collider.isTrigger && (other == null || (other.InPlay && !other.IsPreview)))
                 InPlay = true;
-            if (IsMerging)
+            if (IsMerging || IsBomb)
                 return;
 
-            if (other == null || other.IsPreview || other.IsMerging)
+            if (other == null || other.IsPreview || other.IsMerging || other.IsBomb)
                 return;
 
             if (Colour != other.Colour || Tier != other.Tier)

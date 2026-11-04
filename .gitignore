@@ -105,3 +105,7 @@ InitTestScene*.unity*
 
 # Auto-generated scenes by play mode tests
 /[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+
+# Kebamm: Notion analytics token (internal builds only, never commit)
+/[Aa]ssets/[Rr]esources/Kebamm/Secrets/
+/[Aa]ssets/[Rr]esources/Kebamm/Secrets.meta
