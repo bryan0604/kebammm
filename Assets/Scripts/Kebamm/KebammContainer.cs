@@ -16,6 +16,10 @@ namespace Kebamm
 
         public float InnerHalfWidth { get; private set; }
         public float CapacityY { get; private set; }
+        /// <summary>Drawn red cap line thickness (world units), centred on CapacityY.</summary>
+        public const float CapLineThickness = 0.06f;
+        /// <summary>Bottom edge of the drawn red cap line (world y): the capacity trip height.</summary>
+        public float CapLineBottomY => CapacityY - CapLineThickness * 0.5f;
         public float FloorY { get; private set; }
 
         Transform _wallL, _wallR, _floor, _line;
@@ -96,7 +100,7 @@ namespace Kebamm
             }
 
             _line.position = new Vector3(x, CapacityY, 0f);
-            _line.localScale = new Vector3(width, 0.06f, 1f);
+            _line.localScale = new Vector3(width, CapLineThickness, 1f);
         }
 
         /// <summary>Inner top of the pillars (world y).</summary>

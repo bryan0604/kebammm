@@ -10,18 +10,21 @@ namespace Kebamm
 {
     /// <summary>
     /// Developer cheat console (GDD: Debug Console). Backquote opens/closes on desktop/Editor,
-    /// triple-tap the top-left corner on mobile (corner measured from the safe area, at least 12 mm or 160 px).
+    /// three-finger hold on mobile: 3+ fingers currently in the top 37.5% of the screen, held for more than 5 s.
     /// Compiled only in the Editor and development builds.
-    /// Commands: jump N, next, prev, restart, win, help.
+    /// Commands: jump N, next, prev, restart, win, save, deletesave [confirm], unlockall, setstars N S, help.
     /// </summary>
     public class KebammDebugConsole : MonoBehaviour
     {
         const float PanelHeight = 300f;
         const float SlideDuration = 0.22f;
         const int MaxLines = 5;
-        const float CornerPixels = 160f;   // minimum corner size
-        const float CornerMillimetres = 12f;
-        const float TripleTapWindow = 0.6f;
+        const int HoldFingers = 3;
+        const float HoldTopFraction = 0.375f; // top 1.5/4 of the whole screen
+        const float DefaultHoldSeconds = 5f;  // fallback when Game Manager data is missing
+        // Must be held for more than this (Game Manager debugConsoleHoldSeconds, remote debug_console_hold_seconds).
+        static float HoldSeconds => KebammPrototypeBootstrap.Instance != null && KebammPrototypeBootstrap.Instance.GameManagerData != null
+            ? KebammPrototypeBootstrap.Instance.GameManagerData.DebugConsoleHoldSeconds : DefaultHoldSeconds;
 
         RectTransform _panel;
         GameObject _blocker;
@@ -29,10 +32,18 @@ namespace Kebamm
         Text _output;
         readonly List<string> _lines = new List<string>();
         bool _open;
-        int _taps;
-        float _lastTapTime = -10f;
+        float _holdStart = -1f;
+        bool _holdFired;
 
         public static bool IsOpen { get; private set; }
+
+        // URP's Rendering Debugger opens on a 3-finger double tap in development builds and grabs the same gesture.
+        // Turn its runtime UI off so the 3-finger hold always means the Kebamm console.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void DisableRenderingDebuggerUi()
+        {
+            UnityEngine.Rendering.DebugManager.instance.enableRuntimeUI = false;
+        }
 
         public void Build()
         {
@@ -153,30 +164,46 @@ namespace Kebamm
             else if (_open && kb != null && kb.escapeKey.wasPressedThisFrame)
                 Close();
 
+            UpdateThreeFingerHold();
+        }
+
+        // Three-finger hold: counts the touches that are down and currently inside the top band of the screen
+        // (no start-point or drift rule, other touches are ignored). 3+ of them for more than HoldSeconds toggles
+        // the console once; drop below 3 in the band to re-arm. Input System touch y is 0 at the bottom.
+        void UpdateThreeFingerHold()
+        {
             var ts = Touchscreen.current;
-            if (ts != null && ts.primaryTouch.press.wasPressedThisFrame)
+            if (ts == null)
+                return;
+            float bandBottom = Screen.height * (1f - HoldTopFraction);
+            int inBand = 0;
+            foreach (var touch in ts.touches)
             {
-                Vector2 pos = ts.primaryTouch.position.ReadValue();
-                // Corner from the safe area's top-left (clear of notch / status bar), sized by screen density.
-                Rect safe = Screen.safeArea;
-                float corner = Screen.dpi > 0f ? Mathf.Max(CornerPixels, Screen.dpi * CornerMillimetres / 25.4f) : CornerPixels;
-                if (pos.x <= safe.xMin + corner && pos.y >= safe.yMax - corner)
-                {
-                    float now = Time.unscaledTime;
-                    if (now - _lastTapTime > TripleTapWindow)
-                        _taps = 0;
-                    _taps++;
-                    _lastTapTime = now;
-                    if (_taps >= 3)
-                    {
-                        _taps = 0;
-                        Toggle();
-                    }
-                }
-                else
-                {
-                    _taps = 0;
-                }
+                if (!touch.press.isPressed)
+                    continue;
+                if (touch.position.ReadValue().y >= bandBottom)
+                    inBand++;
+            }
+
+            if (inBand < HoldFingers)
+            {
+                _holdStart = -1f;
+                _holdFired = false;
+                return;
+            }
+            if (_holdFired)
+                return;
+            if (_holdStart < 0f)
+            {
+                _holdStart = Time.unscaledTime;
+                Debug.Log($"[Kebamm] Console hold started ({inBand} fingers in the top band).");
+            }
+            else if (Time.unscaledTime - _holdStart > HoldSeconds)
+            {
+                Debug.Log($"[Kebamm] Debug console opened after {Time.unscaledTime - _holdStart:0.00}s hold (setting={HoldSeconds:0.##})");
+                _holdFired = true;
+                _holdStart = -1f;
+                Toggle();
             }
         }
 
@@ -199,6 +226,7 @@ namespace Kebamm
             _panel.gameObject.SetActive(true);
             _panel.DOKill();
             _panel.DOAnchorPosY(0f, SlideDuration).SetEase(Ease.OutCubic).SetUpdate(true).SetLink(_panel.gameObject);
+            Debug.Log("[Kebamm] Debug console opened.");
             if (_lines.Count == 0)
                 Print("Kebamm debug console. Type help.");
             _input.text = string.Empty;
@@ -254,6 +282,7 @@ namespace Kebamm
             {
                 case "help":
                     Print("jump N | next | prev | restart | win | help");
+                    Print("save | deletesave | unlockall | setstars N S");
                     Print("Levels: " + b.LevelNumbersText);
                     break;
 
@@ -303,10 +332,65 @@ namespace Kebamm
                         Error("Score screen already showing.");
                     else
                     {
-                        Print($"Win: score screen for level {b.CurrentLevelNumber}");
+                        Print($"Win: score screen for level {b.CurrentLevelNumber} (counts as a real result)");
+                        // Q4-A: a debug win records a real result (stars + unlock) like a normal score screen.
+                        Debug.Log($"[KebammSave] Debug win on level {b.CurrentLevelNumber}: recording as a real result.");
                         hud.ShowEnd();
                         Close();
                     }
+                    break;
+
+                case "save":
+                    Print(KebammSaveSystem.Summary());
+                    var levelLines = KebammSaveSystem.LevelLines();
+                    Print(levelLines.Count == 0 ? "No level results yet." : string.Join(" | ", levelLines));
+                    Debug.Log("[KebammSave] Console save: " + KebammSaveSystem.Summary() + " | " + string.Join(" | ", levelLines));
+                    break;
+
+                case "deletesave":
+                    if (parts.Length == 2 && parts[1].ToLowerInvariant() == "confirm")
+                    {
+                        if (KebammDoorTransition.IsPlaying)
+                        {
+                            Error("A transition is running. Try again.");
+                            return;
+                        }
+                        b.DeleteSaveAndRestart();
+                        Print("Save deleted. Fresh save started at level 1.");
+                        Close();
+                    }
+                    else if (parts.Length == 1)
+                    {
+                        Print("<color=#FFD27A>This deletes all progress on this device.</color>");
+                        Print("Type 'deletesave confirm' to delete.");
+                    }
+                    else
+                        Error("Usage: deletesave confirm");
+                    break;
+
+                case "unlockall":
+                    KebammSaveSystem.UnlockAll(b.LastLevelNumber);
+                    Print($"Unlocked up to level {KebammSaveSystem.Data.progress.highestLevelUnlocked}.");
+                    break;
+
+                case "setstars":
+                    if (parts.Length != 3 || !int.TryParse(parts[1], out int starLevel) || !int.TryParse(parts[2], out int stars))
+                    {
+                        Error("Usage: setstars N S (S = 0-3)");
+                        return;
+                    }
+                    if (!b.TryGetLevelIndex(starLevel, out _))
+                    {
+                        Error($"No active level {starLevel}. Levels: {b.LevelNumbersText}");
+                        return;
+                    }
+                    if (stars < 0 || stars > 3)
+                    {
+                        Error("Stars must be 0-3.");
+                        return;
+                    }
+                    KebammSaveSystem.SetStars(starLevel, stars);
+                    Print($"Level {starLevel} stars set to {stars}.");
                     break;
 
                 default:

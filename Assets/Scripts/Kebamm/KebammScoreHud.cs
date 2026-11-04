@@ -218,6 +218,10 @@ namespace Kebamm
             KebammScoreScreenConfig config = KebammScoreScreenConfig.Load();
             int earned = config.StarsForKills(KebammScore.MonstersDestroyed);
             Debug.Log($"[Kebamm] Stars earned: {earned} (monsters destroyed {KebammScore.MonstersDestroyed})");
+            // Save at score-screen display time (stars are final here; the animation only shows them).
+            var boot = KebammPrototypeBootstrap.Instance;
+            if (boot != null)
+                KebammSaveSystem.RecordResult(boot.CurrentLevelNumber, earned, KebammScore.FinalScore, boot.NextLevelNumber);
 
             SetScoreNumbersVisible(false);
             if (_nextButton != null)

@@ -4,9 +4,9 @@ namespace Kebamm
 {
     /// <summary>
     /// CAPACITY RULE (GDD Game Transition): polled every FixedUpdate.
-    /// A ball is in play from its first contact with another ball, the floor or a wall (KebammBall.InPlay);
-    /// merged balls inherit it. The held/aimed ball and a fresh drop before its first contact never count.
-    /// The moment any in-play ball touches the cap band (collider top at or above the band bottom), the
+    /// A ball is in play from its first contact with the floor, a wall or a ball that is already in play (KebammBall.InPlay),
+    /// and passes it on to balls resting on it; a merged ball is in play only if one of its two source balls was. The held/aimed ball and a fresh drop before its first contact never count.
+    /// The moment any in-play ball touches the cap band (collider top at or above the drawn red line's bottom edge), the
     /// container floor opens (bombing run) immediately. Fires once; only during normal play.
     /// </summary>
     [RequireComponent(typeof(BoxCollider2D))]
@@ -37,7 +37,8 @@ namespace Kebamm
                 _box.size = new Vector2(width, _box.size.y);
         }
 
-        float BandBottom => _box != null ? _box.bounds.min.y : transform.position.y;
+        // Trip at the drawn red line's bottom edge (not the thicker trigger band's bottom).
+        float BandBottom => _container != null ? _container.CapLineBottomY : transform.position.y;
 
         void FixedUpdate()
         {
@@ -64,11 +65,11 @@ namespace Kebamm
             }
         }
 
-        /// <summary>Called by the bootstrap when a merge spawns a ball: merges only happen on contact, so it is in play.</summary>
-        public void NotifyMerge(KebammBall merged)
+        /// <summary>Called by the bootstrap when a merge spawns a ball: in play only if one of its source balls was.</summary>
+        public void NotifyMerge(KebammBall merged, bool inPlay = true)
         {
             if (merged != null)
-                merged.InPlay = true;
+                merged.InPlay = inPlay;
         }
 
         public void ResetTimers()

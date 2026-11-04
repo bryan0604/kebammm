@@ -44,6 +44,7 @@ namespace Kebamm
         static string CachePath => Path.Combine(Application.persistentDataPath, CacheFile);
 
         public static bool HasPending => _pending != null;
+        public static bool IsChecking => _fetching;
 
         public static string StatusText
         {
@@ -87,6 +88,8 @@ namespace Kebamm
         /// <summary>Checks the Gist for newer data (launch and every return to the main menu). Never applies by itself.</summary>
         public static void CheckOnline(MonoBehaviour host)
         {
+            if (string.IsNullOrEmpty(_url))
+                KebammSaveSystem.ResolveUsername(null); // no server to ask: device clock (first launch only)
             if (string.IsNullOrEmpty(_url) || _fetching || host == null)
                 return;
             host.StartCoroutine(FetchOnline(_url, _timeout));
@@ -105,6 +108,8 @@ namespace Kebamm
                 req.timeout = Mathf.Max(1, Mathf.CeilToInt(timeout));
                 yield return req.SendWebRequest();
                 _fetching = false;
+                // First launch: username from the server Date header (UTC); null on failure = device clock.
+                KebammSaveSystem.ResolveUsername(req.result == UnityWebRequest.Result.Success ? req.GetResponseHeader("Date") : null);
 
                 if (req.result != UnityWebRequest.Result.Success)
                 {
@@ -295,6 +300,23 @@ namespace Kebamm
             return b;
         }
 
+        /// <summary>Monster Tier Data override: row monster_tier_N applies to every monster asset with that tier.</summary>
+        public static KebammMonsterData ForMonsterTier(KebammMonsterData asset)
+        {
+            if (asset == null) return null;
+            var row = Row("monsterTierData", "monster_tier_" + asset.tier);
+            if (row == null) return asset;
+            if (_copies.TryGetValue(asset, out var done) && done != null) return (KebammMonsterData)done;
+            var m = CopyOf(asset);
+            string n = asset.name;
+            SetFloat(row, "size", n, "size", ref m.size);
+            // Notion "hp" is monster HP. v5 data called it "hit_pts" (it was HP too); per-hit score stays local.
+            if (row.ContainsKey("hp")) SetFloat(row, "hp", n, "hp", ref m.hp);
+            else SetFloat(row, "hit_pts", n, "hp", ref m.hp);
+            SetInt(row, "destroyed_pts", n, "destroyedPts", ref m.destroyedPts);
+            return m;
+        }
+
         public static KebammGameManagerData ForGameManager(KebammGameManagerData asset)
         {
             if (asset == null) return null;
@@ -308,6 +330,12 @@ namespace Kebamm
             SetFloat(row, "jar_to_platform_distance", "GameManager", "jarToPlatformDistance", ref g.jarToPlatformDistance);
             SetFloat(row, "title_breath_duration", "GameManager", "titleBreathDuration", ref g.titleBreathDuration);
             SetFloat(row, "title_letter_height", "GameManager", "titleLetterHeight", ref g.titleLetterHeight);
+            SetFloat(row, "title_pulse_scale", "GameManager", "titlePulseScale", ref g.titlePulseScale);
+            SetFloat(row, "title_pulse_duration", "GameManager", "titlePulseDuration", ref g.titlePulseDuration);
+            SetFloat(row, "title_pulse_interval", "GameManager", "titlePulseInterval", ref g.titlePulseInterval);
+            SetFloat(row, "debug_console_hold_seconds", "GameManager", "debugConsoleHoldSeconds", ref g.debugConsoleHoldSeconds);
+            if (row.ContainsKey("debug_console_hold_seconds"))
+                Debug.Log("[KebammRemoteData] debug_console_hold_seconds=" + g.debugConsoleHoldSeconds.ToString(CultureInfo.InvariantCulture));
             return g;
         }
 

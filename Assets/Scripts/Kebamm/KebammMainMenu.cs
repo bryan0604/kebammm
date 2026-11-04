@@ -48,6 +48,13 @@ namespace Kebamm
 
         TextMeshProUGUI _dataLabel;
         GameObject _updateRoot;
+        GameObject _deleteConfirmRoot;
+        UnityEngine.UI.Button _soundButton;
+        UnityEngine.UI.Button _musicButton;
+        TextMeshProUGUI _playerName;
+        TextMeshProUGUI _playerStars;
+        string _shownName;
+        int _shownStars = -1;
         TextMeshProUGUI _updateText;
         static TMP_FontAsset _font;
         static bool _fontTried;
@@ -65,6 +72,7 @@ namespace Kebamm
 
         void OnDestroy()
         {
+            KebammAudio.Changed -= RefreshToggles;
             KillTweens();
             if (Instance == this)
                 Instance = null;
@@ -76,6 +84,7 @@ namespace Kebamm
                 return;
 
             ApplySafeArea();
+            RefreshPlayerPanel(); // username arrives later from the online check
 
             // Cover fit: scale until both sides are filled, keep aspect, crop the rest.
             Rect r = _rootRect.rect;
@@ -165,6 +174,7 @@ namespace Kebamm
             dataRect.anchorMin = dataRect.anchorMax = dataRect.pivot = new Vector2(1f, 0f);
             dataRect.anchoredPosition = new Vector2(-20f, 16f);
 
+            BuildPlayerPanel();
             BuildSettingsPlaceholder(canvasGo.transform);
             BuildUpdatePrompt(canvasGo.transform);
             RefreshLevel();
@@ -314,16 +324,26 @@ namespace Kebamm
             KillTweens();
             ResetRestPoses();
 
-            // Title: one-time gentle pop in, then a small wave bob (Game Manager "title breath duration").
+            // Title: gentle pop in, then a looping grow pulse plus a small wave bob (Game Manager "title breath duration").
             if (_letters != null)
             {
                 KebammGameManagerData gm = MenuGameManager();
                 float breath = gm != null ? gm.TitleBreathDuration : 1.1f;
+                float pulseScale = gm != null ? gm.TitlePulseScale : 1.1f;
+                float pulseDur = gm != null ? gm.TitlePulseDuration : 0.35f;
+                float pulseInterval = gm != null ? gm.TitlePulseInterval : 5f;
                 for (int i = 0; i < _letters.Length; i++)
                 {
                     var l = _letters[i];
                     l.localScale = Vector3.one * 0.6f;
-                    l.DOScale(1f, 0.35f).SetDelay(0.06f * i).SetEase(Ease.OutBack).SetId(this).SetLink(l.gameObject);
+                    // Pop in once, then (on complete) loop forever: 1 -> pulse scale -> 1, then wait the interval
+                    // (Game Manager title pulse scale / duration / interval). Only these tweens touch the letter's scale.
+                    l.DOScale(1f, 0.35f).SetDelay(0.06f * i).SetEase(Ease.OutBack).SetId(this).SetLink(l.gameObject)
+                        .OnComplete(() => DOTween.Sequence()
+                            .Append(l.DOScale(pulseScale, pulseDur).SetEase(Ease.InOutSine))
+                            .Append(l.DOScale(1f, pulseDur).SetEase(Ease.InOutSine))
+                            .AppendInterval(pulseInterval)
+                            .SetLoops(-1, LoopType.Restart).SetId(this).SetLink(l.gameObject));
                     l.DOAnchorPosY(_letterRest[i].y + 8f, breath).SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo)
                         .SetDelay(0.4f + 0.12f * i).SetId(this).SetLink(l.gameObject);
                 }
@@ -404,31 +424,112 @@ namespace Kebamm
             _levelLabel.text = $"Level {level}";
         }
 
-        // PLACEHOLDER: there is no Settings screen yet. This panel only offers Quit and Back.
+        // PLACEHOLDER Player Information Panel (Notion: Main Menu > Player Information Panel), top-left, not clickable.
+        // Picture = placeholder circle until art; stars = total best stars across all levels.
+        void BuildPlayerPanel()
+        {
+            var panel = KebammPlaceholderUi.Box(_safe, "PlayerInfoPanel", new Color(0f, 0f, 0f, 0.45f), false);
+            RectTransform pr = panel.rectTransform;
+            pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(0f, 1f);
+            pr.anchoredPosition = new Vector2(30f, -30f);
+            pr.sizeDelta = new Vector2(500f, 150f);
+
+            var picture = KebammPlaceholderUi.Box(panel.transform, "PlayerPicture", new Color(0.85f, 0.80f, 0.95f), false);
+            picture.sprite = KebammVisualFactory.CircleSprite;
+            picture.preserveAspect = true;
+            KebammPlaceholderUi.Place(picture.rectTransform, new Vector2(-170f, 0f), new Vector2(120f, 120f));
+
+            _playerName = KebammPlaceholderUi.Label(panel.transform, "Username", "", 38f, new Vector2(70f, 28f), new Vector2(330f, 56f), Color.white);
+            _playerName.alignment = TextAlignmentOptions.Left;
+            _playerName.fontStyle = FontStyles.Bold;
+            _playerStars = KebammPlaceholderUi.Label(panel.transform, "Stars", "", 34f, new Vector2(70f, -32f), new Vector2(330f, 50f), new Color(1f, 0.86f, 0.3f));
+            _playerStars.alignment = TextAlignmentOptions.Left;
+            RefreshPlayerPanel();
+        }
+
+        void RefreshPlayerPanel()
+        {
+            if (_playerName == null)
+                return;
+            string name = KebammSaveSystem.Data.player.username;
+            if (string.IsNullOrEmpty(name))
+                name = "Player...";
+            int stars = KebammSaveSystem.TotalStars();
+            if (name == _shownName && stars == _shownStars)
+                return;
+            _shownName = name;
+            _shownStars = stars;
+            _playerName.text = name;
+            _playerStars.text = "Stars: " + stars;
+        }
+
+        // PLACEHOLDER Settings popup (Notion: Main Menu > Setting Screen Popup): Sound, Music, Delete Save,
+        // Quit Game (unchanged), Terms and Conditions (does nothing yet), Close.
         void BuildSettingsPlaceholder(Transform parent)
         {
-            _settingsRoot = new GameObject("SettingsPlaceholder");
-            _settingsRoot.transform.SetParent(parent, false);
-            Stretch(_settingsRoot.AddComponent<RectTransform>());
+            _settingsRoot = KebammPlaceholderUi.Popup(parent, "SettingsPopup", new Vector2(820f, 1240f), "Settings", 520f);
+            Transform t = _settingsRoot.transform;
+            Vector2 size = new Vector2(560f, 110f);
+            _soundButton = KebammPlaceholderUi.MakeButton(t, "SoundToggle", "Sound", KebammPlaceholderUi.Green, new Vector2(0f, 360f), size,
+                () => KebammAudio.SetSound(!KebammAudio.SoundOn, "settings"));
+            _musicButton = KebammPlaceholderUi.MakeButton(t, "MusicToggle", "Music", KebammPlaceholderUi.Green, new Vector2(0f, 220f), size,
+                () => KebammAudio.SetMusic(!KebammAudio.MusicOn, "settings"));
+            KebammPlaceholderUi.MakeButton(t, "DeleteSaveButton", "Delete Save", KebammPlaceholderUi.Red, new Vector2(0f, 60f), size, OnDeleteSave);
+            KebammPlaceholderUi.MakeButton(t, "QuitButton", "Quit Game", KebammPlaceholderUi.Red, new Vector2(0f, -80f), size, OnQuit);
 
-            var dim = CreateImage(_settingsRoot.transform, "Dimmer", KebammVisualFactory.SquareSprite, new Color(0f, 0f, 0f, 0.7f));
-            Stretch(dim.rectTransform);
-            dim.raycastTarget = true;
+            // Terms and Conditions: link-style text, intentionally does nothing yet (to be researched before publish).
+            var terms = KebammPlaceholderUi.MakeButton(t, "TermsLink", "<u>Terms and Conditions</u>", new Color(1f, 1f, 1f, 0f),
+                new Vector2(0f, -220f), new Vector2(560f, 80f), OnTerms, 36f);
+            var termsLabel = terms.GetComponentInChildren<TextMeshProUGUI>();
+            termsLabel.color = new Color(0.20f, 0.35f, 0.85f);
+            termsLabel.fontStyle = FontStyles.Normal;
 
-            var panel = CreateImage(_settingsRoot.transform, "Panel", KebammVisualFactory.SquareSprite, SettingsFill);
-            Place(panel.rectTransform, new Vector2(0f, 0f), new Vector2(820f, 760f));
+            KebammPlaceholderUi.MakeButton(t, "CloseButton", "Close", KebammPlaceholderUi.Purple, new Vector2(0f, -360f), size, OnSettingsBack);
 
-            CreateLabel(_settingsRoot.transform, "Title", "Settings", 64f,
-                new Vector2(0f, 270f), new Vector2(760f, 90f), SettingsText).fontStyle = FontStyles.Bold;
-            CreateLabel(_settingsRoot.transform, "Note", "Coming soon (placeholder)", 38f,
-                new Vector2(0f, 170f), new Vector2(760f, 60f), SettingsText);
+            // Delete Save confirm.
+            _deleteConfirmRoot = KebammPlaceholderUi.Popup(parent, "DeleteSaveConfirm", new Vector2(820f, 660f), "Are you sure?", 220f);
+            Transform c = _deleteConfirmRoot.transform;
+            KebammPlaceholderUi.Label(c, "Note", "Delete your save? All progress and stars are lost.", 32f,
+                new Vector2(0f, 120f), new Vector2(760f, 60f), KebammPlaceholderUi.PanelText);
+            KebammPlaceholderUi.MakeButton(c, "YesButton", "Yes, delete", KebammPlaceholderUi.Red, new Vector2(0f, -30f), new Vector2(560f, 120f), OnDeleteSaveConfirmed);
+            KebammPlaceholderUi.MakeButton(c, "NoButton", "No", KebammPlaceholderUi.Purple, new Vector2(0f, -190f), new Vector2(560f, 120f), OnDeleteSaveCancelled);
 
-            CreateButton(_settingsRoot.transform, "QuitButton", "Quit Game", 46f, Color.white, new Color(0.85f, 0.27f, 0.32f),
-                null, new Vector2(0f, 10f), 0f, new Vector2(560f, 120f), OnQuit);
-            CreateButton(_settingsRoot.transform, "BackButton", "Back", 46f, Color.white, new Color(0.45f, 0.30f, 0.75f),
-                null, new Vector2(0f, -170f), 0f, new Vector2(560f, 120f), OnSettingsBack);
+            KebammAudio.Changed += RefreshToggles;
+            RefreshToggles();
+        }
 
+        void RefreshToggles()
+        {
+            KebammPlaceholderUi.SetToggle(_soundButton, "Sound", KebammAudio.SoundOn);
+            KebammPlaceholderUi.SetToggle(_musicButton, "Music", KebammAudio.MusicOn);
+        }
+
+        void OnDeleteSave()
+        {
+            Debug.Log("[Kebamm] Settings Delete Save pressed - asking to confirm.");
+            _deleteConfirmRoot.SetActive(true);
+        }
+
+        void OnDeleteSaveCancelled()
+        {
+            Debug.Log("[Kebamm] Settings Delete Save cancelled.");
+            _deleteConfirmRoot.SetActive(false);
+        }
+
+        void OnDeleteSaveConfirmed()
+        {
+            Debug.Log("[Kebamm] Settings Delete Save confirmed - same reset as console 'deletesave confirm'.");
+            _deleteConfirmRoot.SetActive(false);
             _settingsRoot.SetActive(false);
+            if (KebammPrototypeBootstrap.Instance != null)
+                KebammPrototypeBootstrap.Instance.DeleteSaveAndRestart();
+            _shownStars = -1;
+            RefreshPlayerPanel();
+        }
+
+        void OnTerms()
+        {
+            Debug.Log("[Kebamm] Terms and Conditions pressed - placeholder, no link yet.");
         }
 
         // "New game data available" Yes / No prompt (same placeholder style as Settings). Its dimmer blocks menu input.
@@ -496,6 +597,10 @@ namespace Kebamm
                 _root.SetActive(true);
             if (_settingsRoot != null)
                 _settingsRoot.SetActive(false);
+            if (_deleteConfirmRoot != null)
+                _deleteConfirmRoot.SetActive(false);
+            _shownStars = -1;
+            RefreshPlayerPanel();
             RefreshLevel();
             StartIdleTweens();
             ShowUpdatePrompt();
@@ -508,6 +613,8 @@ namespace Kebamm
                 _updateRoot.SetActive(false);
             if (_settingsRoot != null)
                 _settingsRoot.SetActive(false);
+            if (_deleteConfirmRoot != null)
+                _deleteConfirmRoot.SetActive(false);
             if (_root != null)
                 _root.SetActive(false);
         }
@@ -529,7 +636,8 @@ namespace Kebamm
 
         void OnSettings()
         {
-            Debug.Log("[Kebamm] Settings pressed - placeholder panel (no Settings screen yet).");
+            Debug.Log("[Kebamm] Settings pressed - Settings popup opened.");
+            RefreshToggles();
             if (_settingsRoot != null)
                 _settingsRoot.SetActive(true);
         }

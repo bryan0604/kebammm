@@ -36,6 +36,11 @@ namespace Kebamm
      *   ResetSession at the current level. Settings is a placeholder panel
      *   with Quit and Back.
      *
+     * PAUSE:
+     *   Pause button top right of the HUD (KebammPauseMenu) or the app going to background
+     *   sets Time.timeScale 0 and shows the Pause Menu (Resume, Sound, Music, Quit Level).
+     *   Quit Level asks to confirm, then returns to the main menu without recording a result.
+     *
      * CONTROLS:
      *   Mouse X     - aim drop position (clamped inside walls)
      *   LMB / Space - drop next queued ball (tier rolled from level ball tier range; tier 0 if unset)
@@ -85,6 +90,9 @@ namespace Kebamm
 
         /// <summary>True while the dev console is open; ball drops and the R reset ignore input.</summary>
         public static bool GameplayInputBlocked { get; set; }
+
+        /// <summary>True while the level is paused (Time.timeScale 0): physics, drops, monsters, bombing run and timers freeze.</summary>
+        public static bool IsPaused { get; private set; }
         public int CurrentLevelIndex => _levelIndex;
 
         public int CurrentLevelNumber => LevelNumberAt(_levelIndex);
@@ -124,25 +132,118 @@ namespace Kebamm
 
         void Awake()
         {
+            // Android defaults to 30 fps; run at 60 on device.
+            QualitySettings.vSyncCount = 0;
+            Application.targetFrameRate = 60;
             Instance = this;
             GameplayInputBlocked = false;
+            IsPaused = false;
+            Time.timeScale = 1f;
             EnsurePhysicsMaterial();
             // Remote data: apply the cached copy (already accepted) at launch; the Gist is checked on the main menu.
             KebammRemoteData.Begin(this);
             KebammRemoteData.CommitPending();
             LoadLevels();
+            KebammSaveSystem.Load();
+            StartAtSavedLevel();
             BuildWorld();
         }
 
+        // Start at the saved level (last played, else highest unlocked) if it is still an active level.
+        void StartAtSavedLevel()
+        {
+            var progress = KebammSaveSystem.Data.progress;
+            if (TryGetLevelIndex(progress.lastLevelPlayed, out int index) ||
+                TryGetLevelIndex(progress.highestLevelUnlocked, out index))
+                _levelIndex = index;
+            Debug.Log($"[KebammSave] Starting at level {CurrentLevelNumber}");
+        }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused)
+            {
+                // App going to background mid-level: pause; it stays paused (menu shown) when the app returns.
+                if (CanPause && !IsPaused)
+                    PauseGame("app background");
+                KebammSaveSystem.Save();
+            }
+            else if (IsPaused)
+            {
+                Debug.Log("[Kebamm] App back from background - still paused (pause menu shown).");
+            }
+        }
+
+        /// <summary>A level is being played: not on the main menu, score screen or door transition.</summary>
+        public bool CanPause => !InMainMenu && !KebammDoorTransition.IsPlaying &&
+                                (KebammScoreHud.Instance == null || !KebammScoreHud.Instance.IsEndVisible);
+
+        public void PauseGame(string reason)
+        {
+            if (IsPaused || !CanPause)
+                return;
+            IsPaused = true;
+            Time.timeScale = 0f;
+            Debug.Log($"[Kebamm] Paused ({reason}) on level {CurrentLevelNumber}.");
+            if (KebammPauseMenu.Instance != null)
+                KebammPauseMenu.Instance.ShowMenu();
+        }
+
+        public void ResumeGame(string reason)
+        {
+            if (KebammPauseMenu.Instance != null)
+                KebammPauseMenu.Instance.HideAll();
+            if (!IsPaused)
+                return;
+            IsPaused = false;
+            Time.timeScale = 1f;
+            Debug.Log($"[Kebamm] Resumed ({reason}).");
+        }
+
+        /// <summary>Pause Menu Quit Level (confirmed): back to the main menu. No result is recorded and the save is not changed.</summary>
+        public void QuitLevelToMenu()
+        {
+            Debug.Log($"[Kebamm] Quit Level confirmed on level {CurrentLevelNumber} - back to main menu (no result recorded, save unchanged).");
+            ResumeGame("quit level");
+            ResetSession();
+            ShowMainMenu();
+        }
+
+        void OnApplicationQuit()
+        {
+            KebammSaveSystem.Save();
+        }
+
+        /// <summary>Debug console deletesave confirm: fresh save, level 1, back to the main menu, new username.</summary>
+        public void DeleteSaveAndRestart()
+        {
+            KebammSaveSystem.DeleteAndReset();
+            KebammAudio.Refresh(); // fresh save: Sound / Music back to ON
+            _levelIndex = 0;
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.RefreshLevel();
+            ResetSession();
+            ShowMainMenu(); // the online check creates the new username
+            if (!KebammSaveSystem.HasUsername && KebammRemoteData.IsChecking)
+                Debug.Log("[KebammSave] Username will be created when the online check returns.");
+        }
+
+        public int LastLevelNumber => LevelNumberAt(Mathf.Max(0, _activeLevels.Count - 1));
+
         void OnDestroy()
         {
+            if (IsPaused)
+            {
+                IsPaused = false;
+                Time.timeScale = 1f;
+            }
             if (Instance == this)
                 Instance = null;
         }
 
         void Update()
         {
-            if (InMainMenu)
+            if (InMainMenu || IsPaused)
                 return;
 
             var kb = UnityEngine.InputSystem.Keyboard.current;
@@ -294,7 +395,7 @@ namespace Kebamm
             gSr.color = new Color(0.22f, 0.28f, 0.22f);
             gSr.sortingOrder = -1; // below building obstacles (0), which sit 1 layer behind monsters (1)
             groundGo.transform.localScale = new Vector3(GroundWidth, GroundThickness, 1f);
-            groundGo.AddComponent<BoxCollider2D>();
+            KebammMonster.GroundCollider = groundGo.AddComponent<BoxCollider2D>();
             // Background art draws its own grass; keep the collider, hide the flat ground strip.
             if (BuildBackground(cam, (MonsterY - 1f) + GroundThickness * 0.5f))
                 gSr.enabled = false;
@@ -311,6 +412,10 @@ namespace Kebamm
             hudGo.transform.SetParent(transform, false);
             hudGo.AddComponent<KebammScoreHud>().Build();
             KebammScore.ResetScores();
+
+            var pauseGo = new GameObject("PauseMenu");
+            pauseGo.transform.SetParent(transform, false);
+            pauseGo.AddComponent<KebammPauseMenu>().Build();
 
             var menuGo = new GameObject("MainMenu");
             menuGo.transform.SetParent(transform, false);
@@ -345,6 +450,9 @@ namespace Kebamm
             }
 
             KebammMonsterData[] monsterDatas = Resources.LoadAll<KebammMonsterData>("Kebamm");
+            if (monsterDatas != null)
+                for (int i = 0; i < monsterDatas.Length; i++)
+                    monsterDatas[i] = KebammRemoteData.ForMonsterTier(monsterDatas[i]); // remote override copy, or the asset
             if (monsterDatas == null || monsterDatas.Length == 0)
             {
                 monsterDatas = CreateFallbackMonsters();
@@ -686,7 +794,7 @@ namespace Kebamm
         static KebammMonsterData[] CreateFallbackMonsters()
         {
             int[] ids = { 0, 1, 2 };
-            float[] hps = { 100f, 200f, 300f };
+            float[] hps = { 100f, 200f, 500f }; // Notion Monster Tier Data hp
             int[] tiers = { 1, 2, 3 };
             int[] hitPts = { 13, 26, 52 };
             int[] destroyedPts = { 250, 500, 1000 };
@@ -773,7 +881,7 @@ namespace Kebamm
             return preview;
         }
 
-        public void SpawnMergedBall(Vector3 position, KebammBallColour colour, int tier, float startDiameter = -1f)
+        public void SpawnMergedBall(Vector3 position, KebammBallColour colour, int tier, float startDiameter = -1f, bool inPlay = true)
         {
             var ball = SpawnBall(position, colour, tier, preview: false);
             if (ball != null && startDiameter > 0f)
@@ -781,7 +889,7 @@ namespace Kebamm
             var rb = ball.GetComponent<Rigidbody2D>();
             if (rb != null)
                 rb.linearVelocity = Vector2.zero;
-            _capacity?.NotifyMerge(ball);
+            _capacity?.NotifyMerge(ball, inPlay);
             KebammFrameSpikeLog.Merges++;
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
             KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
@@ -855,7 +963,7 @@ namespace Kebamm
         public void AdvanceLevel()
         {
             if (HasNextLevel)
-                _levelIndex++;
+                _levelIndex++; // the save was already written when the score screen was shown
             Debug.Log($"[Kebamm] Current level: {CurrentLevelNumber} (entry {_levelIndex + 1}/{Mathf.Max(1, _activeLevels.Count)})");
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.RefreshLevel();
@@ -906,6 +1014,7 @@ namespace Kebamm
 
         public void ShowMainMenu()
         {
+            ResumeGame("main menu");
             _bombingRun = false;
             _bombingIdleTimer = 0f;
             _dropper?.SetDroppingEnabled(false);
@@ -937,13 +1046,16 @@ namespace Kebamm
             if (!KebammRemoteData.CommitPending())
                 return;
             int index = _levelIndex;
+            int number = CurrentLevelNumber;
             LoadLevels();
-            _levelIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _activeLevels.Count - 1));
+            // Keep the same level number if it still exists (saves are keyed by level number).
+            if (TryGetLevelIndex(number, out int sameLevel))
+                _levelIndex = sameLevel;
+            else
+                _levelIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _activeLevels.Count - 1));
+            LoadGameManager(); // the old remote copy was destroyed by CommitPending; the console reads this instance
             if (_container != null)
-            {
-                LoadGameManager();
                 ApplyLayout();
-            }
             if (_mainMenu != null)
                 _mainMenu.Show();
         }
@@ -958,6 +1070,7 @@ namespace Kebamm
 
         public void ResetSession()
         {
+            ResumeGame("session reset");
             _bombingRun = false;
             _bombingIdleTimer = 0f;
             if (KebammScoreHud.Instance != null)

@@ -32,6 +32,17 @@ namespace Kebamm
         float _maxX = 1000f;
         float _restTimer;
 
+        // Recovery (GDD Monster Behavior Design): a living monster on the ground, tilted past the threshold,
+        // jumps back upright once the delay has passed since its last ball hit. Settings: Game Manager data.
+        /// <summary>The platform ground collider (set by the bootstrap). Only monsters touching it recover.</summary>
+        public static Collider2D GroundCollider;
+        float _lastHitTime = -1000f;
+        bool _recovering;
+        float _recoverStart;
+        float _recoverSpinSpeed;
+        float _knockStartX; // x where the last knock-back started; the recovery hop moves back toward it
+        public bool IsRecovering => _recovering;
+
         // Monsters hold in place (no gravity, frozen) until the first ball hit, and never collide with each other.
         internal static readonly List<Collider2D> LiveColliders = new List<Collider2D>();
         Collider2D _col;
@@ -144,7 +155,8 @@ namespace Kebamm
 
         void ApplyImpact(KebammBall ball, Collision2D collision)
         {
-            Activate();            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
+            Activate();
+            if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
                 return;
 
             float hitX = collision.contactCount > 0 ? collision.GetContact(0).point.x : ball.transform.position.x;
@@ -154,6 +166,7 @@ namespace Kebamm
             if (transform.position.x <= _minX + 0.01f) side = 1f;
             else if (transform.position.x >= _maxX - 0.01f) side = -1f;
 
+            _knockStartX = transform.position.x;
             float s = ball.ImpactStrength;
             _rb.linearVelocity = Vector2.zero;
             _rb.AddForce(new Vector2(side * s * SideRatio, s) * _rb.mass, ForceMode2D.Impulse);
@@ -181,8 +194,26 @@ namespace Kebamm
             if (Mathf.Abs(_rb.angularVelocity) > MaxSpin)
                 _rb.angularVelocity = Mathf.Sign(_rb.angularVelocity) * MaxSpin;
 
-            // Once it has landed and calmed down, wobble back upright (position stays where it landed).
             float tilt = Mathf.DeltaAngle(0f, _rb.rotation);
+            if (_recovering)
+            {
+                TickRecovery(tilt);
+                return;
+            }
+
+            var gm = KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
+            float threshold = gm != null ? gm.MonsterRecoverTiltDegrees : 30f;
+            if (!_defeated && Mathf.Abs(tilt) > threshold)
+            {
+                // Toppled: no small settle; jump back upright after the delay since the last hit (ground only, alive only).
+                _restTimer = 0f;
+                float delay = gm != null ? gm.MonsterRecoverDelay : 5f;
+                if (Time.time - _lastHitTime >= delay && OnGround())
+                    StartRecovery(tilt, gm);
+                return;
+            }
+
+            // Small tilt: once it has landed and calmed down, wobble back upright (position stays where it landed).
             if (_rb.linearVelocity.sqrMagnitude < 0.04f && Mathf.Abs(_rb.angularVelocity) < 45f && Mathf.Abs(tilt) > 0.5f)
             {
                 _restTimer += Time.fixedDeltaTime;
@@ -194,6 +225,43 @@ namespace Kebamm
             }
             else
             {
+                _restTimer = 0f;
+            }
+        }
+
+        bool OnGround() => GroundCollider != null && _col != null && _col.IsTouching(GroundCollider);
+
+        void StartRecovery(float tilt, KebammGameManagerData gm)
+        {
+            float height = gm != null ? gm.MonsterRecoverJumpHeight : 0.8f;
+            float duration = gm != null ? gm.MonsterRecoverJumpDuration : 0.5f;
+            float maxHop = gm != null ? gm.MonsterRecoverHopDistance : 0.6f;
+            float g = Mathf.Abs(Physics2D.gravity.y * _rb.gravityScale);
+            _recovering = true;
+            _recoverStart = Time.time;
+            _recoverSpinSpeed = Mathf.Abs(tilt) / duration;
+            _rb.angularVelocity = 0f;
+            float vy = g > 0f ? Mathf.Sqrt(2f * g * height) : 0f;
+            // Reverse of the knock-back: hop back toward where the last knock started, capped and kept on the platform.
+            float x = transform.position.x;
+            float back = Mathf.Clamp(_knockStartX - x, -maxHop, maxHop);
+            back = Mathf.Clamp(x + back, _minX, _maxX) - x;
+            float airTime = g > 0f ? 2f * vy / g : 0f;
+            float vx = airTime > 0f ? back / airTime : 0f;
+            _rb.linearVelocity = new Vector2(vx, vy);
+            Debug.Log($"[Kebamm] Monster recovering (tilt {tilt:0} deg, jump {height}, {duration}s)");
+        }
+
+        void TickRecovery(float tilt)
+        {
+            // Rotate around Z until local Y faces world up; physics handles the jump arc.
+            _rb.angularVelocity = 0f;
+            _rb.MoveRotation(Mathf.MoveTowards(tilt, 0f, _recoverSpinSpeed * Time.fixedDeltaTime));
+            bool upright = Mathf.Abs(tilt) <= 0.5f;
+            bool falling = _rb.linearVelocity.y <= 0.05f;
+            if ((upright && falling && OnGround()) || Time.time - _recoverStart > 3f)
+            {
+                _recovering = false;
                 _restTimer = 0f;
             }
         }
@@ -214,7 +282,11 @@ namespace Kebamm
             bool ballBroken = ball.TakeDamage(ballDamage);
             Debug.Log($"[Kebamm] Impact Damage={damage} (ball {ballDamage} - monster {monsterHealth}). Monster HP={_health}/{maxHealth}. Ball HP={ball.Health}");
             KebammFrameSpikeLog.Impacts++;
-            KebammScore.AddHit(_hitPts);
+            // Hits during the recovery jump still deal damage but score nothing.
+            bool scores = !_recovering;
+            if (scores)
+                KebammScore.AddHit(_hitPts);
+            _lastHitTime = Time.time;
             if (KebammPrototypeBootstrap.Instance != null)
                 KebammPrototypeBootstrap.Instance.NotifyMonsterImpact();
 
@@ -226,6 +298,7 @@ namespace Kebamm
                 StopCoroutine(_flashRoutine);
             _flashRoutine = StartCoroutine(Flash());
 
+            _recovering = false; // a hit interrupts the recovery hop; the delay restarts from this hit
             ApplyImpact(ball, collision);
 
             if (ballBroken)
@@ -234,7 +307,8 @@ namespace Kebamm
             if (_health <= 0f && !_defeated)
             {
                 _defeated = true;
-                KebammScore.AddDestroy(_destroyedPts);
+                if (scores)
+                    KebammScore.AddDestroy(_destroyedPts);
                 Debug.Log("[Kebamm] Monster defeated");
                 _sr.color = new Color(0.25f, 0.25f, 0.25f);
             }

@@ -195,16 +195,28 @@ namespace Kebamm
             IsMerging = true;
         }
 
+        // Pass in-play along a resting stack: a not-yet-in-play ball touching an in-play ball becomes in play.
+        void OnCollisionStay2D(Collision2D collision)
+        {
+            if (InPlay || IsPreview || collision.collider.isTrigger)
+                return;
+            var other = collision.collider.GetComponent<KebammBall>();
+            if (other == null || (other.InPlay && !other.IsPreview))
+                InPlay = true;
+        }
+
         void OnCollisionEnter2D(Collision2D collision)
         {
             if (IsPreview)
                 return;
-            if (!collision.collider.isTrigger)
-                InPlay = true; // first touch on a ball, floor or wall
+            var other = collision.collider.GetComponent<KebammBall>();
+            // In play only from a real contact: floor, wall or any non-ball solid, or a ball that is already in play.
+            // Touching another still-falling ball does not count (spam-drop bombing bug).
+            if (!collision.collider.isTrigger && (other == null || (other.InPlay && !other.IsPreview)))
+                InPlay = true;
             if (IsMerging)
                 return;
 
-            var other = collision.collider.GetComponent<KebammBall>();
             if (other == null || other.IsPreview || other.IsMerging)
                 return;
 
@@ -224,13 +236,14 @@ namespace Kebamm
             Vector3 mid = (transform.position + other.transform.position) * 0.5f;
             float startDiameter = Mathf.Max(transform.localScale.x, other.transform.localScale.x);
             int nextTier = Tier + 1;
+            bool mergedInPlay = InPlay || other.InPlay;
             var colour = Colour;
 
             Destroy(other.gameObject);
             Destroy(gameObject);
 
             if (KebammPrototypeBootstrap.Instance != null)
-                KebammPrototypeBootstrap.Instance.SpawnMergedBall(mid, colour, nextTier, startDiameter);
+                KebammPrototypeBootstrap.Instance.SpawnMergedBall(mid, colour, nextTier, startDiameter, mergedInPlay);
         }
     }
 }

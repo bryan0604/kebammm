@@ -14,9 +14,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pillarHeight: 5.8
   pillarGapWidth: 5
-  capsLineHeight: 4.95
+  capsLineHeight: 5.1
   jarToPlatformDistance: 3.525
+  launcherFollowSharpness: 0
+  monsterRecoverTiltDegrees: 30
+  monsterRecoverDelay: 5
+  monsterRecoverJumpHeight: 0.8
+  monsterRecoverJumpDuration: 0.5
+  monsterRecoverHopDistance: 0.6
   titleBreathDuration: 1.1
   titleLetterHeight: 200
+  titlePulseScale: 1.1
+  titlePulseDuration: 0.35
+  debugConsoleHoldSeconds: 5
+  titlePulseInterval: 5
   remoteDataUrl: https://gist.githubusercontent.com/bryan0604/e5d81b25e0da4571a131483f506f1b97/raw/kebamm_data.json
   remoteDataTimeoutSeconds: 5

@@ -5,9 +5,10 @@ using UnityEngine.InputSystem;
 namespace Kebamm
 {
     /// <summary>
-    /// Mouse X aims drop position; left-click or Space drops the queued ball.
-    /// Touch (GDD Mobile - Touch Screen Control): touch and hold anywhere, the launcher jumps to the
-    /// first finger's X; releasing that finger drops the ball. Touches that start on UI are ignored.
+    /// Snap control (GDD Mobile - Touch Screen Control): touch/click and hold anywhere; the launcher snaps instantly to
+    /// the finger's/mouse's X (clamped pillar-to-pillar) and follows it instantly while held.
+    /// Releasing drops the ball; holding never drops. Space also drops. Touches that start on UI are ignored;
+    /// a touch during which 3+ fingers were down (debug console hold) never drops.
     /// Uses the new Input System (project activeInputHandler = Input System Only).
     /// </summary>
     public class KebammDropController : MonoBehaviour
@@ -50,9 +51,10 @@ namespace Kebamm
             if (_preview != null && _preview.gameObject.activeSelf != allowDrop)
                 _preview.gameObject.SetActive(allowDrop);
 
-            if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked)
+            if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked || KebammPrototypeBootstrap.IsPaused)
             {
                 _touchHolding = false; // cancel a hold; lifting later must not drop
+                _mouseHolding = false;
                 return;
             }
 
@@ -60,16 +62,29 @@ namespace Kebamm
             bool touchActive = HandleTouch(ref dropPressed);
 
             // Mouse is skipped while a touch is active this frame, so simulated mouse-from-touch cannot double-drop.
-            if (!touchActive)
+            // Same relative drag as touch: press holds, horizontal movement steers, release drops.
+            var mouse = Mouse.current;
+            if (!touchActive && mouse != null)
             {
-                // Follow the mouse only when it moved: on mobile an idle Mouse device reads (0,0) = far left.
-                if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
-                    UpdateAim(Mouse.current.position.ReadValue());
-                if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame && !PointerOverUi(-1))
-                    dropPressed = true;
+                if (mouse.leftButton.wasPressedThisFrame)
+                {
+                    _mouseHolding = !PointerOverUi(-1);
+                    if (_mouseHolding)
+                        BeginDrag(mouse.position.ReadValue().x);
+                }
+                if (_mouseHolding)
+                    Drag(mouse.position.ReadValue().x);
+                if (mouse.leftButton.wasReleasedThisFrame)
+                {
+                    if (_mouseHolding)
+                        dropPressed = true;
+                    _mouseHolding = false;
+                }
             }
             if (Keyboard.current != null && Keyboard.current.spaceKey.wasPressedThisFrame)
                 dropPressed = true;
+
+            FollowTarget();
 
             if (dropPressed && _cooldownLeft <= 0f)
                 Drop();
@@ -90,12 +105,19 @@ namespace Kebamm
 
             int id = touch.touchId.ReadValue();
             if (pressed)
+            {
                 _touchHolding = !PointerOverUi(id);
+                if (_touchHolding)
+                    BeginDrag(touch.position.ReadValue().x);
+            }
             // UI hover can lag a frame behind the press, so also cancel if the finger is over UI while held.
             if (_touchHolding && PointerOverUi(id))
                 _touchHolding = false;
+            // 3+ fingers during this touch (debug console hold): cancel, lifting must not drop.
+            if (_touchHolding && CountTouchesDown(ts) >= 3)
+                _touchHolding = false;
             if (_touchHolding)
-                UpdateAim(touch.position.ReadValue());
+                Drag(touch.position.ReadValue().x);
             if (released)
             {
                 if (_touchHolding)
@@ -103,6 +125,15 @@ namespace Kebamm
                 _touchHolding = false;
             }
             return true;
+        }
+
+        static int CountTouchesDown(Touchscreen ts)
+        {
+            int n = 0;
+            foreach (var t in ts.touches)
+                if (t.press.isPressed)
+                    n++;
+            return n;
         }
 
         static bool PointerOverUi(int pointerId)
@@ -113,42 +144,82 @@ namespace Kebamm
             return pointerId >= 0 ? es.IsPointerOverGameObject(pointerId) : es.IsPointerOverGameObject();
         }
 
-        // Last aim position (mouse or finger), reused when a new held ball spawns after a drop.
-        Vector2? _lastAimScreen;
-
         // Launcher X kept for the app session (static), so new levels and restarts start where the last ball
         // was aimed (GDD Controls). Not saved to disk: an app restart starts from the centre again.
         static float? s_sessionLauncherX;
 
-        void UpdateAim()
+        // Snap control: the target is the finger's/mouse's world X (absolute), set on press and every held frame.
+        bool _mouseHolding;
+        float _dragStartScreenX;
+        float _dragStartTargetX;
+        float _targetX;
+        bool _hasTarget;
+
+        /// <summary>Fallback easing sharpness (1/s) if Game Manager data is missing. Higher = snappier; 0 = no easing.</summary>
+        public float FollowSharpness = 0f;
+
+        void BeginDrag(float screenX)
         {
-            if (_lastAimScreen.HasValue)
-                UpdateAim(_lastAimScreen.Value);
-            else if (s_sessionLauncherX.HasValue)
-                PlaceAtWorldX(s_sessionLauncherX.Value);
-            else if (_preview != null)
-                UpdateAim(Camera.main != null ? (Vector2)Camera.main.WorldToScreenPoint(transform.position) : Vector2.zero);
+            EnsureTarget();
+            _dragStartScreenX = screenX;
+            _dragStartTargetX = _targetX;
+            Drag(screenX); // snap on touch-down
         }
 
-        void UpdateAim(Vector2 screen)
+        void Drag(float screenX)
+        {
+            if (_preview == null || _container == null || Screen.width <= 0)
+                return;
+            var cam = Camera.main;
+            if (cam == null)
+                return;
+            // ScreenToWorldPoint's z is distance from the camera (camera at z=-10, gameplay on z=0).
+            float depth = Mathf.Abs(cam.transform.position.z);
+            if (depth < 0.01f)
+                depth = 10f;
+            _targetX = Clamped(cam.ScreenToWorldPoint(new Vector3(screenX, 0f, depth)).x);
+            _hasTarget = true;
+            s_sessionLauncherX = _targetX;
+        }
+
+        void EnsureTarget()
+        {
+            if (_hasTarget)
+                return;
+            _targetX = s_sessionLauncherX ?? (_container != null ? _container.transform.position.x : 0f);
+            _hasTarget = true;
+        }
+
+        void FollowTarget()
         {
             if (_preview == null)
                 return;
-            _lastAimScreen = screen;
-
-            float x = transform.position.x;
-            var cam = Camera.main;
-            if (cam != null)
-            {
-                // ScreenToWorldPoint's z is distance from the camera, not world Z.
-                // Camera sits at z=-10 looking at gameplay on z=0.
-                float depth = Mathf.Abs(cam.transform.position.z);
-                if (depth < 0.01f)
-                    depth = 10f;
-                Vector3 world = cam.ScreenToWorldPoint(new Vector3(screen.x, screen.y, depth));
-                x = world.x;
-            }
+            EnsureTarget();
+            _targetX = Clamped(_targetX); // held ball size or container width may have changed
+            var gm = _bootstrap != null ? _bootstrap.GameManagerData : null;
+            float sharpness = gm != null ? gm.LauncherFollowSharpness : FollowSharpness;
+            float x = _preview.transform.position.x;
+            x = sharpness <= 0f ? _targetX : Mathf.Lerp(x, _targetX, 1f - Mathf.Exp(-sharpness * Time.unscaledDeltaTime));
             PlaceAtWorldX(x);
+        }
+
+        /// <summary>Places a newly spawned held ball at the current target (no easing).</summary>
+        void UpdateAim()
+        {
+            EnsureTarget();
+            _targetX = Clamped(_targetX);
+            PlaceAtWorldX(_targetX);
+        }
+
+        float Clamped(float x)
+        {
+            if (_preview == null || _container == null)
+                return x;
+            float pad = _preview.Radius + 0.05f;
+            float cx = _container.transform.position.x;
+            float minX = cx - _container.InnerHalfWidth + pad;
+            float maxX = cx + _container.InnerHalfWidth - pad;
+            return minX > maxX ? cx : Mathf.Clamp(x, minX, maxX);
         }
 
         /// <summary>Clamps to the current container's inner width (it can differ per level) and moves the held ball.</summary>
@@ -156,12 +227,7 @@ namespace Kebamm
         {
             if (_preview == null || _container == null)
                 return;
-            float pad = _preview.Radius + 0.05f;
-            float minX = _container.transform.position.x - _container.InnerHalfWidth + pad;
-            float maxX = _container.transform.position.x + _container.InnerHalfWidth - pad;
-            x = Mathf.Clamp(x, minX, maxX);
-            _preview.transform.position = new Vector3(x, DropY, 0f);
-            s_sessionLauncherX = x;
+            _preview.transform.position = new Vector3(Clamped(x), DropY, 0f);
         }
 
         void Drop()
