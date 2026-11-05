@@ -18,3 +18,4 @@ MonoBehaviour:
   mergePts: 80
   impactStrength: 7.5
   ballSize: 1
+  impactAoeRange: 1

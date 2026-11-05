@@ -71,18 +71,20 @@ namespace Kebamm
         RectTransform _comboBar;
         RectTransform _comboFill;
         TextMeshProUGUI _comboLabel;
-        const float ComboBarWidth = 260f;
-        const float ComboBarHeight = 30f;
+        float _comboBarWidth = 360f; // from combo_config barWidth / barHeight when built
 
         void BuildComboBar(Transform parent)
         {
+            KebammComboConfig cfg = KebammCombo.Config;
+            _comboBarWidth = cfg.BarWidth;
+            float barHeight = cfg.BarHeight;
             var root = new GameObject("ComboBar");
             root.transform.SetParent(parent, false);
             _comboBar = root.AddComponent<RectTransform>();
             _comboBar.anchorMin = _comboBar.anchorMax = new Vector2(0f, 1f);
             _comboBar.pivot = new Vector2(0f, 1f);
-            _comboBar.anchoredPosition = new Vector2(30f, -40f);
-            _comboBar.sizeDelta = new Vector2(ComboBarWidth, ComboBarHeight);
+            _comboBar.anchoredPosition = cfg.barPosition;
+            _comboBar.sizeDelta = new Vector2(_comboBarWidth, barHeight);
             var bg = root.AddComponent<Image>();
             bg.sprite = KebammVisualFactory.SquareSprite;
             bg.color = new Color(0f, 0f, 0f, 0.55f);
@@ -101,20 +103,65 @@ namespace Kebamm
             fill.color = new Color(1f, 0.78f, 0.15f, 1f);
             fill.raycastTarget = false;
 
-            _comboLabel = CreateLabel(root.transform, "ComboLabel", "Combo 0/100", 22f,
-                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(ComboBarWidth, ComboBarHeight));
+            _comboLabel = CreateLabel(root.transform, "ComboLabel", "Combo 0/100", cfg.barLabelFontSize,
+                new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(_comboBarWidth, barHeight));
             RefreshCombo();
         }
+
+        // Animated fill state (left-to-right, left pivot). _fillT is the shown fraction 0..1.
+        float _fillT;
+        int _lastBarPoints;
+        int _lastTotal;
+        Sequence _fillSeq;
 
         void RefreshCombo()
         {
             if (_comboFill == null)
                 return;
-            int cap = KebammCombo.Config.BarCapacity;
-            float t = Mathf.Clamp01((float)KebammCombo.BarPoints / cap);
-            _comboFill.sizeDelta = new Vector2((ComboBarWidth - 6f) * t, _comboFill.sizeDelta.y);
+            KebammComboConfig cfg = KebammCombo.Config;
+            int cap = cfg.BarCapacity;
+            int bar = KebammCombo.BarPoints;
+            int total = KebammCombo.TotalComboPoints;
+            float target = Mathf.Clamp01((float)bar / cap);
+            int gain = total - _lastTotal;
+            bool overflow = gain > 0 && _lastBarPoints + gain >= cap;
+            _lastBarPoints = bar;
+            _lastTotal = total;
+
+            if (_fillSeq != null && _fillSeq.IsActive())
+                _fillSeq.Kill(); // rapid merges: never stack tweens, continue from the shown value
+            _fillSeq = null;
+
+            float dur = Mathf.Max(0f, cfg.barFillDuration);
+            if (gain <= 0 || dur <= 0f || !isActiveAndEnabled)
+            {
+                SetFill(target, cap); // reset / new attempt / animation off: snap
+                return;
+            }
+
+            _fillSeq = DOTween.Sequence().SetLink(_comboFill.gameObject);
+            if (overflow)
+            {
+                // Bomb earned: animate to full, reset to 0, then animate to the carried-over amount.
+                _fillSeq.Append(DOTween.To(() => _fillT, v => SetFill(v, cap), 1f, dur).SetEase(cfg.barFillEase));
+                _fillSeq.AppendCallback(() => SetFill(0f, cap));
+                if (target > 0f)
+                    _fillSeq.Append(DOTween.To(() => _fillT, v => SetFill(v, cap), target, dur).SetEase(cfg.barFillEase));
+            }
+            else
+            {
+                _fillSeq.Append(DOTween.To(() => _fillT, v => SetFill(v, cap), target, dur).SetEase(cfg.barFillEase));
+            }
+            _fillSeq.OnComplete(() => _fillSeq = null);
+        }
+
+        void SetFill(float t, int cap)
+        {
+            _fillT = Mathf.Clamp01(t);
+            if (_comboFill != null)
+                _comboFill.sizeDelta = new Vector2((_comboBarWidth - 6f) * _fillT, _comboFill.sizeDelta.y);
             if (_comboLabel != null)
-                _comboLabel.text = $"Combo {KebammCombo.BarPoints}/{cap}";
+                _comboLabel.text = $"Combo {Mathf.RoundToInt(_fillT * cap)}/{cap}";
         }
 
         void PulseComboBar(int fills)

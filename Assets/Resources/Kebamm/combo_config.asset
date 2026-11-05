@@ -18,6 +18,7 @@ MonoBehaviour:
   - 60
   - 80
   - 100
+  minComboToShowText: 2
   comboTextFormat: 'Combo {combo_count}!'
   comboTextFontSize: 36
   comboTextScale: 0.09
@@ -26,9 +27,23 @@ MonoBehaviour:
   comboTextDuration: 0.9
   comboTextYOffset: 0.5
   comboTextColor: {r: 1, g: 0.85, b: 0.2, a: 1}
+  barWidth: 360
+  barHeight: 60
+  barPosition: {x: 30, y: -190}
+  barLabelFontSize: 40
   barCapacity: 100
   barPulseScale: 1.15
   barPulseDuration: 0.15
   barPulseCount: 2
+  barFillDuration: 0.5
+  barFillEase: 12
   bombDiameter: 0.5
   indicatorIconSize: 0.3
+  overlayColor: {r: 1, g: 0.3, b: 0.2, a: 1}
+  overlayAlpha: 0.15
+  overlayFlashAlpha: 0.5
+  overlayFadeDuration: 0.4
+  impactOverlayEnabled: 1
+  impactOverlayColor: {r: 1, g: 0.55, b: 0.1, a: 1}
+  impactOverlayAlpha: 0.45
+  impactOverlayFadeDuration: 0.3

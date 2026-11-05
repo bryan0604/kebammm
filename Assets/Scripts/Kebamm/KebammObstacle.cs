@@ -103,23 +103,35 @@ namespace Kebamm
 
         void OnCollisionEnter2D(Collision2D collision)
         {
-            if (_destroyed)
-                return;
             var boot = KebammPrototypeBootstrap.Instance;
             if (boot == null || !boot.IsBombingRun)
                 return;
 
             var ball = collision.collider.GetComponent<KebammBall>();
-            if (ball == null || ball.IsPreview || ball.IsBomb) // Magic Bomb: no obstacle damage
+            if (ball == null || ball.IsPreview || ball.IsBomb || ball.Spent) // Magic Bomb: no obstacle damage
+                return;
+            if (_destroyed)
+                return; // rubble has no collision
+
+            Vector2 point = collision.contactCount > 0 ? collision.GetContact(0).point : (Vector2)ball.transform.position;
+            ball.TakeDamage(ball.Damage); // kept for the log; the ball is removed on contact whatever its HP
+            ReceiveHit(ball.Damage, ball.ImpactStrength, point.x, "direct");
+            // Ball On Impact: hitting a building explodes too, then the ball is removed.
+            KebammImpactExplosion.Explode(ball, point, this);
+        }
+
+        /// <summary>Damage + sideways push from a direct hit or an impact explosion (bombing run only).</summary>
+        public void ReceiveHit(float ballDamage, float strength, float hitX, string source)
+        {
+            var boot = KebammPrototypeBootstrap.Instance;
+            if (_destroyed || boot == null || !boot.IsBombingRun)
                 return;
 
-            // Same damage rule as KebammMonster: building loses ball damage, ball takes damage concurrently.
-            float ballDamage = ball.Damage;
+            // Same damage rule as KebammMonster: building loses ball damage.
             float before = _health;
             _health = Mathf.Max(0f, before - ballDamage);
-            bool ballBroken = ball.TakeDamage(ballDamage);
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-            Debug.Log($"[Kebamm] Obstacle {Shape} hit Damage={ballDamage - before} HP={_health}/{_data.hp} Ball HP={ball.Health}");
+            Debug.Log($"[Kebamm] Obstacle {Shape} hit ({source}) Damage={ballDamage - before} HP={_health}/{_data.hp}");
 #endif
             KebammFrameSpikeLog.Impacts++;
             boot.NotifyMonsterImpact(); // counts as bombing-run activity
@@ -127,15 +139,12 @@ namespace Kebamm
             KebammDamageNumber.Spawn(_sr.bounds, ballDamage);
 
             Activate();
-            Push(ball, collision);
+            Push(strength, hitX);
 
             if (_flash != null)
                 StopCoroutine(_flash);
             if (_health > 0f)
                 _flash = StartCoroutine(Flash());
-
-            if (ballBroken)
-                Destroy(ball.gameObject);
 
             if (_health <= 0f)
             {
@@ -171,14 +180,13 @@ namespace Kebamm
             }
         }
 
-        void Push(KebammBall ball, Collision2D collision)
+        void Push(float strength, float hitX)
         {
-            float hitX = collision.contactCount > 0 ? collision.GetContact(0).point.x : ball.transform.position.x;
             float dx = transform.position.x - hitX;
             float side = Mathf.Abs(dx) < 0.02f ? (Random.value < 0.5f ? -1f : 1f) : Mathf.Sign(dx);
             if (transform.position.x <= _minX + 0.01f) side = 1f;
             else if (transform.position.x >= _maxX - 0.01f) side = -1f;
-            float s = ball.ImpactStrength * _data.PushMultiplier;
+            float s = strength * _data.PushMultiplier;
             Vector2 v = _rb.linearVelocity;
             _rb.linearVelocity = new Vector2(0f, Mathf.Min(0f, v.y));
             _rb.AddForce(new Vector2(side * s * SideRatio * _rb.mass, 0f), ForceMode2D.Impulse);

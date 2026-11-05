@@ -80,7 +80,8 @@ namespace Kebamm
             }
             QueuedBombs += fills;
             Debug.Log($"[Kebamm] Combo {ComboCount}: +{pts} combo points, bar {BarPoints}/{cap}, attempt total {TotalComboPoints}");
-            KebammComboText.Spawn(position + Vector3.up * cfg.comboTextYOffset, cfg.TextFor(ComboCount), cfg);
+            if (ComboCount >= cfg.minComboToShowText) // points and bar still count below this; only the popup is skipped
+                KebammComboText.Spawn(position + Vector3.up * cfg.comboTextYOffset, cfg.TextFor(ComboCount), cfg);
             Changed?.Invoke();
             if (fills > 0)
             {

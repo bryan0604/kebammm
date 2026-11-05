@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 namespace Kebamm
@@ -16,6 +17,8 @@ namespace Kebamm
         public List<int> comboPoints = new List<int> { 20, 40, 60, 80, 100 };
 
         [Header("Combo Text")]
+        [Tooltip("Lowest combo count that shows the floating 'Combo N!' text (2 = no popup for combo 1). Points and bar are unaffected.")]
+        public int minComboToShowText = 2;
         [Tooltip("Float text. {combo_count} is replaced by the merge's combo count.")]
         public string comboTextFormat = "Combo {combo_count}!";
         public float comboTextFontSize = 36f;
@@ -32,6 +35,14 @@ namespace Kebamm
         public Color comboTextColor = new Color(1f, 0.85f, 0.2f, 1f);
 
         [Header("Combo Bar")]
+        [Tooltip("Combo bar width in HUD canvas units (1080x1920 reference).")]
+        public float barWidth = 360f;
+        [Tooltip("Combo bar height in HUD canvas units.")]
+        public float barHeight = 60f;
+        [Tooltip("Bar top-left corner offset from the screen's top-left (x right, y down negative). Sits below the level label.")]
+        public Vector2 barPosition = new Vector2(30f, -190f);
+        [Tooltip("Font size of the 'Combo N/100' text on the bar.")]
+        public float barLabelFontSize = 40f;
         [Tooltip("Combo points needed for one Magic Bomb.")]
         public int barCapacity = 100;
         [Tooltip("Scale the bar pulses to when it fills.")]
@@ -40,6 +51,10 @@ namespace Kebamm
         public float barPulseDuration = 0.15f;
         [Tooltip("Grow + shrink cycles per fill.")]
         public int barPulseCount = 2;
+        [Tooltip("Seconds for the bar fill to animate to a new value (each leg of an overflow). 0 = snap.")]
+        public float barFillDuration = 0.5f;
+        [Tooltip("Ease of the bar fill: OutQuart = fast at first, slowing near the target.")]
+        public Ease barFillEase = Ease.OutQuart;
 
         [Header("Magic Bomb (placeholder look)")]
         [Tooltip("Bomb diameter in world units.")]
@@ -47,7 +62,29 @@ namespace Kebamm
         [Tooltip("Indicator icon diameter beside the launcher (world units).")]
         public float indicatorIconSize = 0.3f;
 
+        [Header("Bomb Overlay")]
+        [Tooltip("Placeholder explosion-area circle colour (alpha set below). Diameter = 2 x bomb_explode_range.")]
+        public Color overlayColor = new Color(1f, 0.3f, 0.2f, 1f);
+        [Tooltip("Overlay alpha during the countdown.")]
+        [Range(0f, 1f)] public float overlayAlpha = 0.15f;
+        [Tooltip("Overlay alpha at the moment of the explosion flash.")]
+        [Range(0f, 1f)] public float overlayFlashAlpha = 0.5f;
+        [Tooltip("Seconds for the flash to fade out.")]
+        public float overlayFadeDuration = 0.4f;
+
+        [Header("Ball Impact Explosion Overlay")]
+        [Tooltip("Show a quick flash at the impact point sized to the ball tier's impact_aoe_range.")]
+        public bool impactOverlayEnabled = true;
+        [Tooltip("Impact explosion flash colour (alpha comes from Impact Overlay Alpha).")]
+        public Color impactOverlayColor = new Color(1f, 0.55f, 0.1f, 1f);
+        [Tooltip("Flash alpha at the moment of the impact explosion.")]
+        [Range(0f, 1f)] public float impactOverlayAlpha = 0.45f;
+        [Tooltip("Seconds for the impact flash to fade out.")]
+        public float impactOverlayFadeDuration = 0.3f;
+
         public int BarCapacity => Mathf.Max(1, barCapacity);
+        public float BarWidth => Mathf.Max(20f, barWidth);
+        public float BarHeight => Mathf.Max(8f, barHeight);
 
         public int PointsFor(int comboCount)
         {

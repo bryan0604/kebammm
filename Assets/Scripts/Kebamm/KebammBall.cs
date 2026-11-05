@@ -17,6 +17,8 @@ namespace Kebamm
         public float Damage { get; private set; }
         public float Health { get; private set; }
         public float ImpactStrength { get; private set; }
+        /// <summary>Set once the ball has exploded / touched the ground; it is being removed and ignores further contacts.</summary>
+        public bool Spent { get; private set; }
         /// <summary>Magic Bomb (combo power-up): never merges, deals no impact damage, explodes via KebammMagicBomb.</summary>
         public bool IsBomb { get; private set; }
 
@@ -205,6 +207,21 @@ namespace Kebamm
                 rb.linearVelocity = rb.linearVelocity.normalized * MergePushMaxSpeed;
         }
 
+        /// <summary>Marks the ball as used up and turns its colliders off so no second contact is processed this frame.</summary>
+        public void MarkSpent()
+        {
+            Spent = true;
+            foreach (var c in GetComponents<Collider2D>())
+                c.enabled = false;
+        }
+
+        void Start()
+        {
+            // Defeated monsters are untouchable: this ball/bomb passes through them.
+            foreach (var c in GetComponents<Collider2D>())
+                KebammMonster.IgnoreDeadMonsters(c);
+        }
+
         public bool TakeDamage(float amount)
         {
             Health = Mathf.Max(0f, Health - amount);
@@ -228,6 +245,17 @@ namespace Kebamm
         void OnCollisionEnter2D(Collision2D collision)
         {
             if (IsPreview)
+                return;
+            // Ball On Impact: touching the village ground (platform outside the jar, not the jar floor) explodes like a
+            // monster/obstacle hit (no direct target, so everything in range takes one hit) and removes the ball.
+            if (!IsBomb && !Spent && KebammMonster.GroundCollider != null && collision.collider == KebammMonster.GroundCollider)
+            {
+                Vector2 point = collision.contactCount > 0 ? collision.GetContact(0).point : (Vector2)transform.position;
+                Debug.Log($"[Kebamm] Ball T{Tier + 1} touched the ground: exploding. HP={Health}");
+                KebammImpactExplosion.Explode(this, point, null);
+                return;
+            }
+            if (Spent)
                 return;
             var other = collision.collider.GetComponent<KebammBall>();
             // In play only from a real contact: floor, wall or any non-ball solid, or a ball that is already in play.

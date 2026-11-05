@@ -297,6 +297,7 @@ namespace Kebamm
             SetFloat(row, "hp", n, "hp", ref b.hp);
             SetInt(row, "merge_pts", n, "mergePts", ref b.mergePts);
             SetFloat(row, "impact_strength", n, "impactStrength", ref b.impactStrength);
+            SetFloat(row, "impact_aoe_range", n, "impactAoeRange", ref b.impactAoeRange);
             return b;
         }
 

@@ -14,11 +14,15 @@ namespace Kebamm
         public float impactStrength = 3f;
         [Tooltip("Ball diameter in world units for this tier (spawn, held ball, merge grow, collider and art all scale to it). 0 = fallback formula 2*(0.28+0.14*(tier-1)).")]
         public float ballSize;
+        [Tooltip("Ball On Impact explosion radius (world units) when this ball directly hits a monster or obstacle. Notion impact_aoe_range. < 0 = built-in fallback.")]
+        public float impactAoeRange = -1f;
 
         static Dictionary<int, KebammBallTierData> _byTier;
         // Built-in fallbacks when a tier row is missing (Notion Ball Tier Data v14).
         static readonly float[] DefaultDamage = { 50f, 100f, 150f, 200f, 250f };
         static readonly int[] DefaultMergePtsByTier = { 20, 40, 80, 190, 380 };
+        // impact_aoe_range fallbacks T1..T5 (Notion v19). The merge-only top tier (T6, no row) uses the T5 value.
+        static readonly float[] DefaultImpactAoeRange = { 0.5f, 0.75f, 1.0f, 1.4f, 1.8f };
 
         public static void Resolve(int playTier, out float damage, out float hp)
         {
@@ -55,6 +59,16 @@ namespace Kebamm
             if (_byTier != null && _byTier.TryGetValue(dataTier, out KebammBallTierData row) && row != null && row.impactStrength > 0f)
                 return row.impactStrength;
             return 2f + dataTier * 0.5f;
+        }
+
+        /// <summary>Impact explosion radius for a code tier (0-based). T6 (no row) is clamped to the T5 row, like damage and impact strength.</summary>
+        public static float ImpactAoeRangeForPlayTier(int playTier)
+        {
+            int dataTier = Mathf.Clamp(playTier + 1, 1, 5);
+            Ensure();
+            if (_byTier != null && _byTier.TryGetValue(dataTier, out KebammBallTierData row) && row != null && row.impactAoeRange >= 0f)
+                return row.impactAoeRange;
+            return DefaultImpactAoeRange[dataTier - 1];
         }
 
         /// <summary>Diameter for a code tier (0-based). Uses the tier row's ballSize; the merge-only top tier (no row) and 0/missing values use the formula.</summary>

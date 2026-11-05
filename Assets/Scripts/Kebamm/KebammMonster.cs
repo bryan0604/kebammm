@@ -45,6 +45,8 @@ namespace Kebamm
 
         // Monsters hold in place (no gravity, frozen) until the first ball hit, and never collide with each other.
         internal static readonly List<Collider2D> LiveColliders = new List<Collider2D>();
+        // Defeated monsters: untouchable by balls/bombs (Physics2D.IgnoreCollision), still collide with the ground so they keep rolling.
+        static readonly List<Collider2D> DeadColliders = new List<Collider2D>();
         Collider2D _col;
         float _activeGravity = 1.4f;
         bool _activated;
@@ -150,16 +152,18 @@ namespace Kebamm
         void OnDestroy()
         {
             if (_col != null)
+            {
                 LiveColliders.Remove(_col);
+                DeadColliders.Remove(_col);
+            }
         }
 
-        void ApplyImpact(KebammBall ball, Collision2D collision)
+        void ApplyImpact(float strength, float hitX)
         {
             Activate();
             if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
                 return;
 
-            float hitX = collision.contactCount > 0 ? collision.GetContact(0).point.x : ball.transform.position.x;
             float dx = transform.position.x - hitX;
             float side = Mathf.Abs(dx) < 0.02f ? (Random.value < 0.5f ? -1f : 1f) : Mathf.Sign(dx);
             // Against an edge, always bounce back inward.
@@ -167,7 +171,7 @@ namespace Kebamm
             else if (transform.position.x >= _maxX - 0.01f) side = -1f;
 
             _knockStartX = transform.position.x;
-            float s = ball.ImpactStrength;
+            float s = strength;
             _rb.linearVelocity = Vector2.zero;
             _rb.AddForce(new Vector2(side * s * SideRatio, s) * _rb.mass, ForceMode2D.Impulse);
             // Flying right spins clockwise (negative Z), flying left counter-clockwise.
@@ -268,19 +272,28 @@ namespace Kebamm
 
         void OnCollisionEnter2D(Collision2D collision)
         {
+            var ball = collision.collider.GetComponent<KebammBall>();
+            if (ball == null || ball.IsPreview || ball.IsBomb || ball.Spent) // Magic Bomb: no impact damage
+                return;
+
+            if (_defeated)
+                return; // dead monsters are untouchable (collision is ignored; guard only)
+            Vector2 point = collision.contactCount > 0 ? collision.GetContact(0).point : (Vector2)ball.transform.position;
+            ball.TakeDamage(ball.Damage); // kept for the log; the ball is removed on contact whatever its HP
+            ReceiveHit(ball.Damage, ball.ImpactStrength, point.x, "direct");
+            // Ball On Impact: direct contact explodes (AOE on other monsters/obstacles) and removes the ball.
+            KebammImpactExplosion.Explode(ball, point, this);
+        }
+
+        /// <summary>Damage + push from a direct hit or an impact explosion. Same score rules for both (no score during the recovery hop).</summary>
+        public void ReceiveHit(float ballDamage, float strength, float hitX, string source)
+        {
             if (_defeated)
                 return;
-
-            var ball = collision.collider.GetComponent<KebammBall>();
-            if (ball == null || ball.IsPreview || ball.IsBomb) // Magic Bomb: no impact damage
-                return;
-
-            float ballDamage = ball.Damage;
             float monsterHealth = _health;
             float damage = ballDamage - monsterHealth;
             _health = Mathf.Max(0f, monsterHealth - ballDamage);
-            bool ballBroken = ball.TakeDamage(ballDamage);
-            Debug.Log($"[Kebamm] Impact Damage={damage} (ball {ballDamage} - monster {monsterHealth}). Monster HP={_health}/{maxHealth}. Ball HP={ball.Health}");
+            Debug.Log($"[Kebamm] Impact ({source}) Damage={damage} (ball {ballDamage} - monster {monsterHealth}). Monster HP={_health}/{maxHealth}");
             KebammFrameSpikeLog.Impacts++;
             // Hits during the recovery jump still deal damage but score nothing.
             bool scores = !_recovering;
@@ -299,14 +312,12 @@ namespace Kebamm
             _flashRoutine = StartCoroutine(Flash());
 
             _recovering = false; // a hit interrupts the recovery hop; the delay restarts from this hit
-            ApplyImpact(ball, collision);
-
-            if (ballBroken)
-                Destroy(ball.gameObject);
+            ApplyImpact(strength, hitX);
 
             if (_health <= 0f && !_defeated)
             {
                 _defeated = true;
+                SetUntouchable(true);
                 if (scores)
                     KebammScore.AddDestroy(_destroyedPts);
                 Debug.Log("[Kebamm] Monster defeated");
@@ -323,9 +334,39 @@ namespace Kebamm
             _flashRoutine = null;
         }
 
+        /// <summary>Called by every ball/bomb when it spawns: ignore collisions with monsters that are already defeated.</summary>
+        public static void IgnoreDeadMonsters(Collider2D ballCol)
+        {
+            if (ballCol == null)
+                return;
+            DeadColliders.RemoveAll(c => c == null);
+            foreach (var c in DeadColliders)
+                Physics2D.IgnoreCollision(ballCol, c, true);
+        }
+
+        void SetUntouchable(bool on)
+        {
+            if (_col == null)
+                _col = GetComponent<Collider2D>();
+            if (_col == null)
+                return;
+            if (on) { if (!DeadColliders.Contains(_col)) DeadColliders.Add(_col); }
+            else DeadColliders.Remove(_col);
+            int n = 0;
+            foreach (var ball in FindObjectsByType<KebammBall>(FindObjectsSortMode.None))
+                foreach (var bc in ball.GetComponents<Collider2D>())
+                {
+                    Physics2D.IgnoreCollision(_col, bc, on);
+                    n++;
+                }
+            Debug.Log($"[Kebamm] Monster {(on ? "defeated: untouchable by" : "revived: collides again with")} balls/bombs ({n} ball colliders updated); ground collision kept");
+        }
+
         public void ResetHealth()
         {
             _health = maxHealth;
+            if (_defeated)
+                SetUntouchable(false);
             _defeated = false;
             if (_sr != null)
                 _sr.color = _baseColor;

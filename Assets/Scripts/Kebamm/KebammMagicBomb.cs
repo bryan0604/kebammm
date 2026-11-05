@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DG.Tweening;
 using UnityEngine;
 
 namespace Kebamm
@@ -18,6 +19,8 @@ namespace Kebamm
         float _timer;
         float _life;
 
+        SpriteRenderer _overlay; // placeholder explosion-area circle (no collider), own root so bomb scale doesn't apply
+
         static readonly HashSet<KebammBall> Hits = new HashSet<KebammBall>();
 
         void OnCollisionEnter2D(Collision2D collision)
@@ -28,6 +31,7 @@ namespace Kebamm
                 return;
             _armed = true;
             _timer = 0f;
+            ShowOverlay();
             Debug.Log($"[Kebamm] Magic Bomb touched {collision.collider.name}; exploding in {Delay():0.##}s");
         }
 
@@ -43,6 +47,63 @@ namespace Kebamm
 
         static KebammGameManagerData Gm => KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
         static float Delay() => Gm != null ? Gm.BombTouchDelay : 1.2f;
+
+        static float Range() => Gm != null ? Gm.BombExplodeRange : 8f;
+
+        /// <summary>Circle of diameter 2 x bomb_explode_range (OverlapCircleAll uses range as a radius).</summary>
+        void ShowOverlay()
+        {
+            if (_overlay != null)
+                return;
+            KebammComboConfig cfg = KebammCombo.Config;
+            var go = new GameObject("MagicBombRange");
+            go.transform.position = transform.position;
+            _overlay = go.AddComponent<SpriteRenderer>();
+            _overlay.sprite = KebammVisualFactory.CircleSprite; // 1 world unit across at scale 1
+            Color c = cfg.overlayColor;
+            c.a = cfg.overlayAlpha;
+            _overlay.color = c;
+            _overlay.sortingOrder = 30; // above balls (0..20), below HUD
+            UpdateOverlay();
+            Debug.Log($"[Kebamm] Magic Bomb range overlay: radius {Range():0.##}, diameter {Range() * 2f:0.##} world units");
+        }
+
+        void UpdateOverlay()
+        {
+            if (_overlay == null)
+                return;
+            _overlay.transform.position = new Vector3(transform.position.x, transform.position.y, 0f);
+            _overlay.transform.localScale = Vector3.one * (Range() * 2f); // live range from data
+        }
+
+        void LateUpdate()
+        {
+            if (!_exploded)
+                UpdateOverlay();
+        }
+
+        void FlashOverlayAndRelease()
+        {
+            if (_overlay == null)
+                return;
+            UpdateOverlay();
+            KebammComboConfig cfg = KebammCombo.Config;
+            SpriteRenderer sr = _overlay;
+            _overlay = null;
+            Color c = sr.color;
+            c.a = cfg.overlayFlashAlpha;
+            sr.color = c;
+            sr.DOFade(0f, Mathf.Max(0.01f, cfg.overlayFadeDuration))
+                .SetEase(Ease.OutQuad)
+                .SetLink(sr.gameObject)
+                .OnComplete(() => { if (sr != null) Destroy(sr.gameObject); });
+        }
+
+        void OnDestroy()
+        {
+            if (_overlay != null)
+                Destroy(_overlay.gameObject); // bomb removed before exploding (reset, unarmed timeout)
+        }
 
         void Update()
         {
@@ -68,7 +129,7 @@ namespace Kebamm
         {
             _exploded = true;
             var gm = Gm;
-            float range = gm != null ? gm.BombExplodeRange : 8f;
+            float range = Range();
             int damage = gm != null ? gm.BombExplodeDamage : 10;
             int strength = gm != null ? gm.BombExplodeStrength : 3;
             Vector2 centre = transform.position;
@@ -100,6 +161,7 @@ namespace Kebamm
             }
             Debug.Log($"[Kebamm] Magic Bomb exploded at ({centre.x:0.00}, {centre.y:0.00}) range={range} damage={damage} strength={strength}: balls hit={Hits.Count} destroyed={destroyed} pushed={pushed}");
             Hits.Clear();
+            FlashOverlayAndRelease();
             Destroy(gameObject);
         }
     }
