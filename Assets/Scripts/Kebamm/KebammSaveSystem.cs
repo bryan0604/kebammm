@@ -20,6 +20,7 @@ namespace Kebamm
     {
         public int highestLevelUnlocked = 1;
         public int lastLevelPlayed = 1;
+        public int coins = 0; // total coins earned (Sprint 4 coin reward); no spending yet
     }
 
     [Serializable]
@@ -207,7 +208,7 @@ namespace Kebamm
         }
 
         /// <summary>Score screen result. Best-only; unlocks nextLevel.</summary>
-        public static void RecordResult(int level, int stars, int score, int nextLevel)
+        public static void RecordResult(int level, int stars, int score, int nextLevel, int coinsEarned = 0)
         {
             if (SkipNextResult)
             {
@@ -223,6 +224,9 @@ namespace Kebamm
             pr.highestLevelUnlocked = Mathf.Max(pr.highestLevelUnlocked, Mathf.Max(level, nextLevel));
             // Written when the score screen is shown: quitting there resumes at the next level.
             pr.lastLevelPlayed = Mathf.Max(level, nextLevel);
+            int oldCoins = pr.coins;
+            pr.coins = Mathf.Max(0, pr.coins) + Mathf.Max(0, coinsEarned);
+            Debug.Log($"{LogTag} Coins: +{Mathf.Max(0, coinsEarned)} ({oldCoins} -> {pr.coins})");
             Debug.Log($"{LogTag} Level {level} result: stars {stars} (best {oldStars} -> {l.bestStars}), score {score} (best {oldScore} -> {l.bestScore}), highest unlocked {pr.highestLevelUnlocked}, last played {pr.lastLevelPlayed}");
             Save();
             Debug.Log($"{LogTag} Saved to disk at score screen (level {level}).");
@@ -279,6 +283,8 @@ namespace Kebamm
             Save();
         }
 
+        public static int Coins => Data.progress.coins;
+
         public static int BestStars(int level) => GetLevel(level, false)?.bestStars ?? 0;
 
         /// <summary>Sum of best stars across all saved levels (main menu player panel).</summary>
@@ -296,7 +302,7 @@ namespace Kebamm
             if (d == null)
                 return "(not loaded)";
             string name = string.IsNullOrEmpty(d.player.username) ? "(pending)" : d.player.username;
-            return $"user {name}, highest unlocked {d.progress.highestLevelUnlocked}, last played {d.progress.lastLevelPlayed}, levels saved {d.levels.Count}, sound {(d.settings.soundOn ? "on" : "off")}, music {(d.settings.musicOn ? "on" : "off")}";
+            return $"user {name}, highest unlocked {d.progress.highestLevelUnlocked}, coins {d.progress.coins}, last played {d.progress.lastLevelPlayed}, levels saved {d.levels.Count}, sound {(d.settings.soundOn ? "on" : "off")}, music {(d.settings.musicOn ? "on" : "off")}";
         }
 
         /// <summary>Per-level lines for the debug console.</summary>

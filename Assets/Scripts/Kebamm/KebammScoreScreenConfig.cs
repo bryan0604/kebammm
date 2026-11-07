@@ -4,7 +4,8 @@ namespace Kebamm
 {
     /// <summary>
     /// Score screen timing and star rule. Loaded from Resources/Kebamm/score_screen_config.
-    /// GDD cue: Score Screen > 1s > Scores Numbers (Merge Score, Monster Score) > 1s > 3 Stars Logics > 2s > Next Button.
+    /// GDD cue: Score Screen > 1s > Scores Numbers (Merge Score, Monster Score) > 1s > Final Score > 0.25s > Rewards Earn
+    /// (coin count-up) > 1s > 3 Stars Logics > 2s > Next Button.
     /// Each delay counts from the previous step.
     /// </summary>
     [CreateAssetMenu(fileName = "score_screen_config", menuName = "Kebamm/Score Screen Config")]
@@ -15,7 +16,13 @@ namespace Kebamm
         [Header("Sequence (seconds, each after the previous step)")]
         [Tooltip("After the score screen opens, wait this long before showing the Merge and Monster score numbers.")]
         public float scoreNumbersDelay = 1f;
-        [Tooltip("After the score numbers appear, wait this long before the stars pop.")]
+        [Tooltip("After Merge and Monster score appear, wait this long before Final Score (GDD 1s).")]
+        public float finalScoreDelay = 1f;
+        [Tooltip("After Final Score appears, wait this long before Rewards Earn (coins) (GDD 0.25s).")]
+        public float rewardDelay = 0.25f;
+        [Tooltip("Length of the coin count-up from 0 to the coins earned.")]
+        public float rewardCountDuration = 0.6f;
+        [Tooltip("After Rewards Earn appears, wait this long before the stars pop.")]
         public float starsDelay = 1f;
         [Tooltip("After the stars start popping, wait this long before showing the Next button.")]
         public float nextButtonDelay = 2f;
@@ -72,6 +79,12 @@ namespace Kebamm
         {
             if (scoreNumbersDelay < 0f)
                 scoreNumbersDelay = 0f;
+            if (finalScoreDelay < 0f)
+                finalScoreDelay = 0f;
+            if (rewardDelay < 0f)
+                rewardDelay = 0f;
+            if (rewardCountDuration < 0f)
+                rewardCountDuration = 0f;
             if (starsDelay < 0f)
                 starsDelay = 0f;
             if (nextButtonDelay < 0f)

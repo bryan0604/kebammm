@@ -29,6 +29,14 @@ namespace Kebamm
         TextMeshProUGUI _endMergeValue;
         TextMeshProUGUI _endMonsterValue;
         TextMeshProUGUI _endFinalValue;
+        TextMeshProUGUI _endCoinsLabel;
+        TextMeshProUGUI _endCoinsValue;
+        Tween _coinCountTween;
+
+        /// <summary>Coins earned by the last finished attempt (score screen, save and log all use this).</summary>
+        public static int LastCoinsEarned { get; private set; }
+
+        static readonly Color CoinTextColor = new Color(1f, 0.84f, 0.15f, 1f); // placeholder gold, same as earned star
         GameObject _endRoot;
         CanvasGroup _endGroup;
         bool _ended;
@@ -236,8 +244,15 @@ namespace Kebamm
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(900f, 56f));
             _endFinalValue = CreateLabel(_endRoot.transform, "EndFinalValue", "0", 96f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(900f, 130f));
+            // Rewards Earn (placeholder text, no final art): coins earned this level, counts up from 0.
+            _endCoinsLabel = CreateLabel(_endRoot.transform, "EndCoinsLabel", "Coins Earned", 36f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -225f), new Vector2(900f, 56f));
+            _endCoinsLabel.color = CoinTextColor;
+            _endCoinsValue = CreateLabel(_endRoot.transform, "EndCoinsValue", "+0", 60f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -290f), new Vector2(900f, 80f));
+            _endCoinsValue.color = CoinTextColor;
             _endNextLevelValue = CreateLabel(_endRoot.transform, "EndNextLevelValue", "Next: Level 1", 34f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -236f), new Vector2(900f, 56f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -370f), new Vector2(900f, 56f));
 
             var buttonGo = new GameObject("NextLevel");
             buttonGo.transform.SetParent(_endRoot.transform, false);
@@ -245,7 +260,7 @@ namespace Kebamm
             buttonRect.anchorMin = new Vector2(0.5f, 0.5f);
             buttonRect.anchorMax = new Vector2(0.5f, 0.5f);
             buttonRect.pivot = new Vector2(0.5f, 0.5f);
-            buttonRect.anchoredPosition = new Vector2(0f, -350f);
+            buttonRect.anchoredPosition = new Vector2(0f, -480f);
             buttonRect.sizeDelta = new Vector2(520f, 120f);
             var buttonImage = buttonGo.AddComponent<Image>();
             buttonImage.sprite = KebammVisualFactory.SquareSprite;
@@ -352,17 +367,34 @@ namespace Kebamm
             return earned;
         }
 
+        /// <summary>Notion 'Game Reward - Tabulation': coins from kills, stars and merge score (Game Manager tunables).</summary>
+        static int CalculateCoins(KebammPrototypeBootstrap boot, int stars)
+        {
+            var gm = boot != null ? boot.GameManagerData : null;
+            if (gm == null)
+                gm = Resources.Load<KebammGameManagerData>("Kebamm/GameManager");
+            if (gm == null)
+                gm = ScriptableObject.CreateInstance<KebammGameManagerData>();
+            int kills = KebammScore.MonstersDestroyed;
+            int merge = KebammScore.MergeScore;
+            int coins = gm.CoinsFor(kills, stars, merge);
+            Debug.Log($"[Kebamm] Coins earned: {coins} (kills {kills} x {gm.CoinPerKill} + stars {stars} x {gm.CoinPerStar} + merge {merge} / {gm.MergePointsPerCoin} = {coins}; cap {gm.CoinCap})");
+            return coins;
+        }
+
         void PlayEndSequence()
         {
             KillEndSequence();
             KebammScoreScreenConfig config = KebammScoreScreenConfig.Load();
-            // Save at score-screen display time (stars are final here; the animation only shows them).
+            // Save at score-screen display time (stars and coins are final here; the animation only shows them).
             var boot = KebammPrototypeBootstrap.Instance;
             int earned = CalculateStars(boot);
+            int coins = CalculateCoins(boot, earned);
+            LastCoinsEarned = coins;
             if (boot != null)
             {
                 bool debugWin = KebammSaveSystem.SkipNextResult;
-                KebammSaveSystem.RecordResult(boot.CurrentLevelNumber, earned, KebammScore.FinalScore, boot.NextLevelNumber);
+                KebammSaveSystem.RecordResult(boot.CurrentLevelNumber, earned, KebammScore.FinalScore, boot.NextLevelNumber, coins);
                 if (!debugWin)
                     KebammLevelResults.Record(boot.CurrentLevelNumber, earned);
             }
@@ -370,11 +402,18 @@ namespace Kebamm
             SetScoreNumbersVisible(false);
             if (_nextButton != null)
                 _nextButton.SetActive(false);
+            SetFinalScoreVisible(false);
+            SetCoinsVisible(false);
             PrepareStars(earned);
 
+            // Merge + Monster > 1s > Final Score > 0.25s > Rewards Earn (count-up) > stars > Next button.
             _endSequence = DOTween.Sequence()
                 .AppendInterval(config.scoreNumbersDelay)
                 .AppendCallback(() => SetScoreNumbersVisible(true))
+                .AppendInterval(config.finalScoreDelay)
+                .AppendCallback(() => SetFinalScoreVisible(true))
+                .AppendInterval(config.rewardDelay)
+                .AppendCallback(() => PlayCoinCount(coins, config.rewardCountDuration))
                 .AppendInterval(config.starsDelay)
                 .AppendCallback(() => PopStars(earned, config))
                 .AppendInterval(config.nextButtonDelay)
@@ -393,6 +432,64 @@ namespace Kebamm
                 _endSequence.Kill();
                 _endSequence = null;
             }
+            KillCoinCount();
+        }
+
+        void KillCoinCount()
+        {
+            if (_coinCountTween != null)
+            {
+                _coinCountTween.Kill();
+                _coinCountTween = null;
+            }
+            if (_endCoinsValue != null)
+                _endCoinsValue.transform.DOKill();
+        }
+
+        void SetFinalScoreVisible(bool visible)
+        {
+            if (_endFinalValue != null)
+                _endFinalValue.gameObject.SetActive(visible);
+        }
+
+        void SetCoinsVisible(bool visible)
+        {
+            if (_endCoinsLabel != null)
+                _endCoinsLabel.gameObject.SetActive(visible);
+            if (_endCoinsValue != null)
+                _endCoinsValue.gameObject.SetActive(visible);
+        }
+
+        // Rewards Earn: shows the coin number and ticks it up from 0, with a small punch when it lands.
+        void PlayCoinCount(int coins, float duration)
+        {
+            KillCoinCount();
+            SetCoinsVisible(true);
+            if (_endCoinsValue == null)
+                return;
+            Transform tr = _endCoinsValue.transform;
+            tr.localScale = Vector3.one;
+            if (duration <= 0f || coins <= 0)
+            {
+                _endCoinsValue.text = "+" + coins;
+                return;
+            }
+            int shown = 0;
+            _endCoinsValue.text = "+0";
+            _coinCountTween = DOTween.To(() => shown, v => { shown = v; _endCoinsValue.text = "+" + v; }, coins, duration)
+                .SetEase(Ease.OutQuad)
+                .SetLink(_endCoinsValue.gameObject)
+                .OnComplete(() =>
+                {
+                    _coinCountTween = null;
+                    if (_endCoinsValue == null)
+                        return;
+                    _endCoinsValue.text = "+" + coins;
+                    _endCoinsValue.transform.DOPunchScale(Vector3.one * 0.15f, 0.25f, 6, 0.8f)
+                        .SetLink(_endCoinsValue.gameObject)
+                        .OnKill(() => { if (_endCoinsValue != null) _endCoinsValue.transform.localScale = Vector3.one; });
+                })
+                .OnKill(() => { if (_endCoinsValue != null) _endCoinsValue.text = "+" + coins; });
         }
 
         void SetScoreNumbersVisible(bool visible)
@@ -565,6 +662,8 @@ namespace Kebamm
             KillEndSequence();
             ResetStars();
             SetScoreNumbersVisible(true);
+            SetFinalScoreVisible(true);
+            SetCoinsVisible(true);
             if (_nextButton != null)
                 _nextButton.SetActive(true);
             if (_endGroup != null)

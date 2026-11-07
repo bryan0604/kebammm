@@ -97,6 +97,15 @@ namespace Kebamm
         [Range(0f, 100f)] public float dropIndicationOpacity = 30f;
         [Tooltip("Dotted aim guide thickness in world units. Local only; 0 hides it. Applied live.")]
         [Min(0f)] public float dropIndicationThickness = 0.025f;
+        [Header("Coin Reward (local only, not in Notion)")]
+        [Tooltip("Coins per monster killed this attempt. Local only; not exported to Notion or the Gist.")]
+        public int coinPerKill = 8;
+        [Tooltip("Coins per star earned this attempt (0-3 stars).")]
+        public int coinPerStar = 30;
+        [Tooltip("Merge score is divided by this (1 coin per N merge points). 0 / negative = 100.")]
+        public int mergePointsPerCoin = 100;
+        [Tooltip("Max coins per level result (299 keeps it under 300).")]
+        public int coinCap = 299;
         [Header("Remote Data")]
         [Tooltip("URL of kebamm_data.json (raw Gist link). Empty = no online fetch; cached or built-in data is used.")]
         public string remoteDataUrl = "";
@@ -147,6 +156,22 @@ namespace Kebamm
             if (ratio >= Star2Threshold) return 2;
             if (ratio >= Star1Threshold) return 1;
             return 0;
+        }
+
+        public int CoinPerKill => Mathf.Max(0, coinPerKill);
+        public int CoinPerStar => Mathf.Max(0, coinPerStar);
+        public int MergePointsPerCoin => mergePointsPerCoin > 0 ? mergePointsPerCoin : 100;
+        public int CoinCap => Mathf.Max(0, coinCap);
+
+        /// <summary>
+        /// GDD / Notion 'Game Reward - Tabulation':
+        /// coins = min(cap, floor(kills x perKill + stars x perStar + merge / mergePointsPerCoin)), clamped to [0, cap].
+        /// </summary>
+        public int CoinsFor(int kills, int stars, int mergeScore)
+        {
+            double raw = (double)Mathf.Max(0, kills) * CoinPerKill + (double)Mathf.Clamp(stars, 0, 3) * CoinPerStar
+                         + (double)Mathf.Max(0, mergeScore) / MergePointsPerCoin;
+            return (int)System.Math.Min(CoinCap, System.Math.Max(0.0, System.Math.Floor(raw)));
         }
 
         public float DebugConsoleHoldSeconds => debugConsoleHoldSeconds > 0f ? debugConsoleHoldSeconds : 5f;
