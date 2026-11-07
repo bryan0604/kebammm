@@ -92,6 +92,11 @@ namespace Kebamm
         public Color jarPanelColor = new Color(1f, 1f, 1f, 0.1f);
         [Tooltip("Extra size around the jar inner area (world units, each side). 0 = meets the pillars' and base's visible edges (tucked under them). Negative shrinks.")]
         public float jarPanelPadding = 0f;
+        [Header("Drop Indication (local only, not in Notion)")]
+        [Tooltip("White dotted aim guide opacity in percent (0 hides it). Local only; not exported to Notion or the Gist.")]
+        [Range(0f, 100f)] public float dropIndicationOpacity = 30f;
+        [Tooltip("Dotted aim guide thickness in world units. Local only; 0 hides it. Applied live.")]
+        [Min(0f)] public float dropIndicationThickness = 0.025f;
         [Header("Remote Data")]
         [Tooltip("URL of kebamm_data.json (raw Gist link). Empty = no online fetch; cached or built-in data is used.")]
         public string remoteDataUrl = "";

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -37,6 +38,8 @@ namespace Kebamm
         public void SetDroppingEnabled(bool enabled)
         {
             _canDrop = enabled;
+            if (!enabled)
+                CancelAim();
             if (_preview != null)
                 _preview.gameObject.SetActive(enabled && (_container == null || !_container.IsOpen));
         }
@@ -56,8 +59,7 @@ namespace Kebamm
 
             if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked || KebammPrototypeBootstrap.IsPaused)
             {
-                _touchHolding = false; // cancel a hold; lifting later must not drop
-                _mouseHolding = false;
+                CancelAim(); // lifting later must not drop
                 return;
             }
 
@@ -241,6 +243,7 @@ namespace Kebamm
 
             // Reuse the held ball as the dropped ball instead of destroying it and building a new
             // GameObject in the same frame (removes one create + one destroy per drop).
+            CancelAim();
             var held = _preview;
             _preview = null;
             if (!held.IsBomb)
@@ -382,8 +385,111 @@ namespace Kebamm
             _bombIndicator.transform.position = new Vector3(x, p.y, 0f);
         }
 
+        // ---- Drop indication (local Game Manager settings; shares the existing aim hold) ----------------
+        LineRenderer _dropGuide;
+        Material _dropGuideMaterial;
+        Texture2D _dropGuideTexture;
+        readonly List<RaycastHit2D> _guideHits = new List<RaycastHit2D>(32);
+
+        void CancelAim()
+        {
+            _touchHolding = false;
+            _mouseHolding = false;
+            if (_dropGuide != null)
+                _dropGuide.enabled = false;
+        }
+
+        void OnDisable()
+        {
+            CancelAim();
+        }
+
+        void OnDestroy()
+        {
+            if (_dropGuideMaterial != null)
+                Destroy(_dropGuideMaterial);
+            if (_dropGuideTexture != null)
+                Destroy(_dropGuideTexture);
+        }
+
+        void EnsureDropGuide()
+        {
+            if (_dropGuide != null)
+                return;
+            // One white dash and one transparent gap, repeated at a fixed world-space pitch.
+            _dropGuideTexture = new Texture2D(8, 1, TextureFormat.RGBA32, false);
+            _dropGuideTexture.name = "DropGuideDashes";
+            _dropGuideTexture.wrapMode = TextureWrapMode.Repeat;
+            _dropGuideTexture.filterMode = FilterMode.Point;
+            for (int x = 0; x < 8; x++)
+                _dropGuideTexture.SetPixel(x, 0, x < 4 ? Color.black : new Color(0f, 0f, 0f, 0f));
+            _dropGuideTexture.Apply(false, true);
+            _dropGuideMaterial = new Material(Shader.Find("Sprites/Default"));
+            _dropGuideMaterial.mainTexture = _dropGuideTexture;
+            var go = new GameObject("DropIndication");
+            go.transform.SetParent(transform, false);
+            _dropGuide = go.AddComponent<LineRenderer>();
+            _dropGuide.sharedMaterial = _dropGuideMaterial;
+            _dropGuide.useWorldSpace = true;
+            _dropGuide.positionCount = 2;
+            _dropGuide.textureMode = LineTextureMode.Tile;
+            _dropGuide.textureScale = new Vector2(1f / 0.14f, 1f);
+            _dropGuide.sortingOrder = 4; // above jar panel (-50), below cap line (5), balls and HUD
+            _dropGuide.enabled = false;
+        }
+
+        void LateUpdate()
+        {
+            var gm = _bootstrap != null ? _bootstrap.GameManagerData : null;
+            float alpha = gm != null ? Mathf.Clamp(gm.dropIndicationOpacity, 0f, 100f) * 0.01f : 0.3f;
+            float thickness = gm != null ? Mathf.Max(0f, gm.dropIndicationThickness) : 0.025f;
+            bool show = (_touchHolding || _mouseHolding) && _canDrop && _container != null
+                && !_container.IsOpen && _preview != null && _preview.gameObject.activeInHierarchy
+                && !KebammPrototypeBootstrap.GameplayInputBlocked && !KebammPrototypeBootstrap.IsPaused
+                && alpha > 0f && thickness > 0f;
+            if (!show)
+            {
+                if (_dropGuide != null)
+                    _dropGuide.enabled = false;
+                return;
+            }
+
+            Vector3 start = _preview.transform.position;
+            start.y -= _preview.Radius;
+            float endY = _container.FloorY; // public API: inner floor top, not the base sprite centre
+            float distance = start.y - endY;
+            if (distance > 0f)
+            {
+                // Collect every hit in a reusable, growable list, then select only normal balls.
+                // Non-ball geometry must never mask a ball behind it. No fixed hit-buffer limit.
+                var filter = ContactFilter2D.noFilter;
+                filter.useTriggers = false;
+                Physics2D.Raycast(start, Vector2.down, filter, _guideHits, distance);
+                foreach (var hit in _guideHits)
+                {
+                    var ball = hit.collider.GetComponent<KebammBall>();
+                    if (ball == null || ball == _preview || ball.IsPreview || ball.IsBomb || ball.Spent)
+                        continue;
+                    endY = Mathf.Max(endY, hit.point.y);
+                }
+            }
+            if (start.y - endY <= 0.001f)
+            {
+                if (_dropGuide != null)
+                    _dropGuide.enabled = false;
+                return;
+            }
+            EnsureDropGuide();
+            _dropGuide.startWidth = _dropGuide.endWidth = thickness;
+            _dropGuide.startColor = _dropGuide.endColor = new Color(0f, 0f, 0f, alpha);
+            _dropGuide.SetPosition(0, start);
+            _dropGuide.SetPosition(1, new Vector3(start.x, endY, start.z));
+            _dropGuide.enabled = true;
+        }
+
         public void ClearPreview()
         {
+            CancelAim();
             if (_preview != null)
             {
                 Destroy(_preview.gameObject);
