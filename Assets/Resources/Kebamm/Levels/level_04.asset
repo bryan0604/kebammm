@@ -41,3 +41,7 @@ MonoBehaviour:
   ballTier3Weight: 10
   ballTier4Weight: 0
   ballTier5Weight: 0
+  monsterHpModifier: 1
+  typeLevel: ""
+  bombEveryMoves: 0
+  comboProgressModifier: 1

@@ -46,7 +46,9 @@ namespace Kebamm.EditorTools
             File.Delete(RequestPath);
             s_busy = true;
             Status("started");
-            EditorApplication.delayCall += Run;
+            // Run immediately. delayCall can be lost on a domain reload, or never fire if the
+            // Editor throttles update ticks while it is in the background.
+            Run();
         }
 
         static void Run()

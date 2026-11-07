@@ -19,3 +19,4 @@ MonoBehaviour:
   impactStrength: 7.5
   ballSize: 1
   impactAoeRange: 1
+  bombingRunGravityScale: 1.4

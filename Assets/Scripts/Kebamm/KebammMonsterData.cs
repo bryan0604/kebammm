@@ -7,7 +7,7 @@ namespace Kebamm
     {
         public int id;
         public float hp = 100f;
-        [Range(1, 3)] public int tier = 1;
+        [Range(KebammLevel.MinMonsterTier, KebammLevel.MaxMonsterTier)] public int tier = 1;
         public int hitPts;
         public int destroyedPts;
         [Tooltip("Monster size (world units) for this tier (Notion Monster Tier Data 'size'). 0 = fallback 0.25 / 0.35 / 0.45 for tier 1 / 2 / 3.")]

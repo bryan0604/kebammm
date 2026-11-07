@@ -265,6 +265,7 @@ namespace Kebamm
                 SetLog(n, "prepopulateMonsterTierMax", l.prepopulateMonsterTierMax, (int)tr.y); l.prepopulateMonsterTierMax = (int)tr.y;
             }
             SetFloat(row, "Monster stack chance", n, "monsterStackChance", ref l.monsterStackChance);
+            SetFloat(row, "monster_hp_modifier", n, "monsterHpModifier", ref l.monsterHpModifier); // missing = asset value (default 1)
             SetInt(row, "Ball tier min", n, "ballTierMin", ref l.ballTierMin);
             SetInt(row, "Ball tier max", n, "ballTierMax", ref l.ballTierMax);
             SetFloat(row, "Ball tier 1 weight", n, "ballTier1Weight", ref l.ballTier1Weight);
@@ -281,6 +282,9 @@ namespace Kebamm
                 SetLog(n, "prepopulateObstaclePositionRangeX", l.prepopulateObstaclePositionRangeX, ox);
                 l.prepopulateObstaclePositionRangeX = ox;
             }
+            SetInt(row, "bomb_every_moves", n, "bombEveryMoves", ref l.bombEveryMoves); // missing = asset value (0 = off)
+            SetFloat(row, "combo_progress_modifier", n, "comboProgressModifier", ref l.comboProgressModifier); // missing = asset value (default 1); non-positive treated as 1 at runtime
+            SetString(row, "type_level", n, "typeLevel", ref l.typeLevel); // label only
             return l;
         }
 
@@ -298,6 +302,7 @@ namespace Kebamm
             SetInt(row, "merge_pts", n, "mergePts", ref b.mergePts);
             SetFloat(row, "impact_strength", n, "impactStrength", ref b.impactStrength);
             SetFloat(row, "impact_aoe_range", n, "impactAoeRange", ref b.impactAoeRange);
+            SetFloat(row, "bombing_run_gravity_scale", n, "bombingRunGravityScale", ref b.bombingRunGravityScale);
             return b;
         }
 
@@ -311,9 +316,9 @@ namespace Kebamm
             var m = CopyOf(asset);
             string n = asset.name;
             SetFloat(row, "size", n, "size", ref m.size);
-            // Notion "hp" is monster HP. v5 data called it "hit_pts" (it was HP too); per-hit score stays local.
-            if (row.ContainsKey("hp")) SetFloat(row, "hp", n, "hp", ref m.hp);
-            else SetFloat(row, "hit_pts", n, "hp", ref m.hp);
+            // Notion "hp" is monster HP; "hit_pts" is the per-hit score (since v27; before v5 it meant HP, no longer mapped to hp).
+            SetFloat(row, "hp", n, "hp", ref m.hp);
+            SetInt(row, "hit_pts", n, "hitPts", ref m.hitPts);
             SetInt(row, "destroyed_pts", n, "destroyedPts", ref m.destroyedPts);
             return m;
         }
@@ -338,10 +343,17 @@ namespace Kebamm
             SetFloat(row, "star_1_threshold", "GameManager", "star1Threshold", ref g.star1Threshold);
             SetFloat(row, "star_2_threshold", "GameManager", "star2Threshold", ref g.star2Threshold);
             SetFloat(row, "star_3_threshold", "GameManager", "star3Threshold", ref g.star3Threshold);
-            SetFloat(row, "bomb_touch_delay", "GameManager", "bombTouchDelay", ref g.bombTouchDelay);
-            SetFloat(row, "bomb_explode_range", "GameManager", "bombExplodeRange", ref g.bombExplodeRange);
-            SetInt(row, "bomb_explode_damage", "GameManager", "bombExplodeDamage", ref g.bombExplodeDamage);
-            SetInt(row, "bomb_explode_strength", "GameManager", "bombExplodeStrength", ref g.bombExplodeStrength);
+            // Old bomb_* keys first (older cached data), new magic_bomb_* keys override (5 Nov 2026 rename).
+            SetFloat(row, "bomb_touch_delay", "GameManager", "magicBombTouchDelay", ref g.magicBombTouchDelay);
+            SetFloat(row, "magic_bomb_touch_delay", "GameManager", "magicBombTouchDelay", ref g.magicBombTouchDelay);
+            SetFloat(row, "bomb_explode_range", "GameManager", "magicBombExplodeRange", ref g.magicBombExplodeRange);
+            SetFloat(row, "magic_bomb_explode_range", "GameManager", "magicBombExplodeRange", ref g.magicBombExplodeRange);
+            SetInt(row, "bomb_explode_damage", "GameManager", "magicBombExplodeDamage", ref g.magicBombExplodeDamage);
+            SetInt(row, "magic_bomb_explode_damage", "GameManager", "magicBombExplodeDamage", ref g.magicBombExplodeDamage);
+            SetInt(row, "bomb_explode_strength", "GameManager", "magicBombExplodeStrength", ref g.magicBombExplodeStrength);
+            SetInt(row, "magic_bomb_explode_strength", "GameManager", "magicBombExplodeStrength", ref g.magicBombExplodeStrength);
+            SetFloat(row, "bomb_size", "GameManager", "magicBombSize", ref g.magicBombSize);
+            SetFloat(row, "magic_bomb_size", "GameManager", "magicBombSize", ref g.magicBombSize);
             if (row.ContainsKey("debug_console_hold_seconds"))
                 Debug.Log("[KebammRemoteData] debug_console_hold_seconds=" + g.debugConsoleHoldSeconds.ToString(CultureInfo.InvariantCulture));
             return g;
@@ -393,6 +405,14 @@ namespace Kebamm
             if (!(v is double d) || Math.Abs(d - Math.Round(d)) > 1e-6) { Debug.LogWarning($"{LogTag} {asset}.{key} is not a whole number; kept {target}."); return; }
             SetLog(asset, field, target, (int)Math.Round(d));
             target = (int)Math.Round(d);
+        }
+
+        static void SetString(Dictionary<string, object> row, string key, string asset, string field, ref string target)
+        {
+            if (!row.TryGetValue(key, out object v)) return;
+            if (!(v is string s)) { Debug.LogWarning($"{LogTag} {asset}.{key} is not text; kept {target}."); return; }
+            SetLog(asset, field, target, s);
+            target = s;
         }
 
         static void SetBool(Dictionary<string, object> row, string key, string asset, string field, ref bool target)

@@ -28,6 +28,24 @@ namespace Kebamm
 
         /// <summary>Live (non-preview) balls, kept for allocation-free polling (KebammCapacityMonitor).</summary>
         public static readonly List<KebammBall> Live = new List<KebammBall>();
+
+        /// <summary>Normal gravity (1.4), or this tier's Ball Tier Data bombing_run_gravity_scale during the bombing run. Magic Bombs keep normal gravity.</summary>
+        public void ApplyBombingRunGravity(bool bombingRun)
+        {
+            if (_rb == null || IsPreview)
+                return;
+            _rb.gravityScale = bombingRun && !IsBomb
+                ? KebammBallTierData.BombingRunGravityForPlayTier(Tier)
+                : KebammBallTierData.NormalGravityScale;
+        }
+
+        /// <summary>Switches every live ball (already falling, resting or in the container) to bombing run / normal gravity.</summary>
+        public static void SetBombingRunGravityAll(bool bombingRun)
+        {
+            for (int i = 0; i < Live.Count; i++)
+                if (Live[i] != null)
+                    Live[i].ApplyBombingRunGravity(bombingRun);
+        }
         bool _registered;
 
         public Rigidbody2D Body => _rb;
@@ -42,7 +60,15 @@ namespace Kebamm
             _registered = false;
         }
 
-        public float Radius => IsBomb ? Mathf.Max(0.05f, KebammCombo.Config.bombDiameter) * 0.5f : KebammBallTierData.DiameterForPlayTier(Tier) * 0.5f;
+        public float Radius => IsBomb ? Mathf.Max(0.05f, BombDiameter()) * 0.5f : KebammBallTierData.DiameterForPlayTier(Tier) * 0.5f;
+
+        /// <summary>Magic Bomb diameter: Game Manager bomb_size (remote / asset), else combo_config bombDiameter (0.5).</summary>
+        static float BombDiameter()
+        {
+            var boot = KebammPrototypeBootstrap.Instance;
+            var gm = boot != null ? boot.GameManagerData : null;
+            return gm != null && gm.MagicBombSize > 0f ? gm.MagicBombSize : KebammCombo.Config.bombDiameter;
+        }
 
         // Merge: the merged ball appears at the midpoint of the two balls and grows from the pre-merge size
         // to the new tier size, so physics pushes neighbours aside gradually.
@@ -92,7 +118,8 @@ namespace Kebamm
             {
                 _rb.bodyType = RigidbodyType2D.Dynamic;
                 _rb.simulated = true;
-                _rb.gravityScale = 1.4f;
+                var bootG = KebammPrototypeBootstrap.Instance;
+                ApplyBombingRunGravity(bootG != null && bootG.IsBombingRun);
                 _rb.mass = 1f + Tier * 0.75f;
                 _rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
                 _rb.interpolation = RigidbodyInterpolation2D.Interpolate;

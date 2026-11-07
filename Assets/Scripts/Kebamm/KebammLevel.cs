@@ -31,6 +31,21 @@ namespace Kebamm
         [Tooltip("x = min, y = max")] public Vector2 prepopulateObstaclePositionRangeX = new Vector2(-2f, 2f);
         [Tooltip("x = min, y = max")] public Vector2 prepopulateObstaclePositionRangeY = new Vector2(0f, 1f);
         [Tooltip("Chance (0-1) each prepopulated monster after the first stacks on a random existing stack.")][Range(0f, 1f)] public float monsterStackChance;
+        [Tooltip("Multiplier on every monster's tier HP in this level (Notion Levels column monster_hp_modifier). 500 hp x 1.5 = 750 hp. Rounded, min 1 hp.")][Min(0f)] public float monsterHpModifier = 1f;
+        /// <summary>monsterHpModifier, or 1 when unset / not positive.</summary>
+        public float MonsterHpModifier => monsterHpModifier > 0f ? monsterHpModifier : 1f;
+        /// <summary>Final monster HP for this level: base tier HP x modifier, rounded to the nearest int, minimum 1.</summary>
+        public float ModifiedMonsterHp(float baseHp) => Mathf.Max(1f, Mathf.Round(baseHp * MonsterHpModifier));
+
+        [Header("Level Type & Rules")]
+        [Tooltip("Label only (Notion Levels column Type Level, exported as type_level): Normal / Hard / Fun / King / Bomb. No gameplay effect.")] public string typeLevel = "";
+        [Tooltip("Bomb level rule (Notion Levels column bomb_every_moves): every N normal drops queue 1 Magic Bomb. 0 = off. Magic Bomb drops never count.")][Min(0)] public int bombEveryMoves;
+        /// <summary>bombEveryMoves, or 0 (off) when not positive.</summary>
+        public int BombEveryMoves => bombEveryMoves > 0 ? bombEveryMoves : 0;
+        [Tooltip("Multiplier on combo points that fill the bar (Notion Levels column combo_progress_modifier). e.g. base 20 x 1.5 = 30. Does not change score or Combo N! text. Blank/0 = 1.")]
+        [Min(0f)] public float comboProgressModifier = 1f;
+        /// <summary>comboProgressModifier, or 1 when unset / not positive (same pattern as MonsterHpModifier).</summary>
+        public float ComboProgressModifier => comboProgressModifier > 0f ? comboProgressModifier : 1f;
 
         [Header("Obstacles")]
         [Tooltip("Populate building obstacles at level start. Uses Prepopulate Obstacle Qty and Obstacle Position Range X.")] public bool obstaclePopulate;

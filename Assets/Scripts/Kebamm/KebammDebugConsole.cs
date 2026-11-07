@@ -12,7 +12,7 @@ namespace Kebamm
     /// Developer cheat console (GDD: Debug Console). Backquote opens/closes on desktop/Editor,
     /// three-finger hold on mobile: 3+ fingers currently in the top 37.5% of the screen, held for more than 5 s.
     /// Compiled only in the Editor and development builds.
-    /// Commands: jump N, next, prev, restart, win, save, deletesave [confirm], unlockall, setstars N S, help.
+    /// Commands: jump N, next, prev, restart, win, save, deletesave [confirm], unlockall, setstars N S, bomb [N], help.
     /// </summary>
     public class KebammDebugConsole : MonoBehaviour
     {
@@ -281,7 +281,7 @@ namespace Kebamm
             switch (name)
             {
                 case "help":
-                    Print("jump N | next | prev | restart | win | help");
+                    Print("jump N | next | prev | restart | win | bomb [N] | help");
                     Print("save | deletesave | unlockall | setstars N S");
                     Print("Levels: " + b.LevelNumbersText);
                     break;
@@ -338,6 +338,29 @@ namespace Kebamm
                         hud.ShowEnd();
                         Close();
                     }
+                    break;
+
+                case "bomb":
+                    int bombs = 1;
+                    if (parts.Length > 2 || (parts.Length == 2 && (!int.TryParse(parts[1], out bombs) || bombs < 1 || bombs > 99)))
+                    {
+                        Error("Usage: bomb [N] (N = 1-99, default 1)");
+                        return;
+                    }
+                    var dropper = b.DropController;
+                    if (b.InMainMenu || dropper == null)
+                    {
+                        Error("bomb only works in a level. Use jump N first.");
+                        return;
+                    }
+                    if (KebammScoreHud.Instance != null && KebammScoreHud.Instance.IsEndVisible)
+                    {
+                        Error("bomb only works while playing a level (score screen is showing).");
+                        return;
+                    }
+                    dropper.DebugLoadBombs(bombs);
+                    Print(bombs == 1 ? "Magic Bomb loaded: the next drop is a bomb." : $"Magic Bomb loaded: the next {bombs} drops are bombs.");
+                    Debug.Log($"[Kebamm] Debug console: {bombs} Magic Bomb(s) loaded ({KebammCombo.QueuedBombs} queued behind the held one)");
                     break;
 
                 case "save":

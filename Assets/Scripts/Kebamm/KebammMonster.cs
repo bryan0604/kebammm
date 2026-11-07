@@ -40,6 +40,13 @@ namespace Kebamm
         bool _recovering;
         float _recoverStart;
         float _recoverSpinSpeed;
+        // Return to spawn X (Veritas 5 Nov): after a knock-back a living monster slides back to where it spawned (X only).
+        float _originalX;
+        bool _hasOriginalX;
+        bool _returnPending;
+        bool _returning;
+        float _returnFromX;
+        float _returnStart;
         float _knockStartX; // x where the last knock-back started; the recovery hop moves back toward it
         public bool IsRecovering => _recovering;
 
@@ -103,6 +110,16 @@ namespace Kebamm
             }
             _sr.color = _baseColor;
         }
+
+        /// <summary>Spawn X saved at level start; knocked-back living monsters return here.</summary>
+        public void SetOriginalX(float x)
+        {
+            _originalX = Mathf.Clamp(x, Mathf.Min(_minX, _maxX), Mathf.Max(_minX, _maxX));
+            _hasOriginalX = true;
+            _returnPending = _returning = false;
+        }
+
+        public float OriginalX => _originalX;
 
         /// <summary>Platform x-range for this monster centre; it is never pushed past these edges.</summary>
         public void SetBounds(float minX, float maxX)
@@ -207,6 +224,8 @@ namespace Kebamm
 
             var gm = KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
             float threshold = gm != null ? gm.MonsterRecoverTiltDegrees : 30f;
+            if (!_defeated && Mathf.Abs(tilt) <= threshold)
+                TickReturnToOriginalX(gm);
             if (!_defeated && Mathf.Abs(tilt) > threshold)
             {
                 // Toppled: no small settle; jump back upright after the delay since the last hit (ground only, alive only).
@@ -230,6 +249,41 @@ namespace Kebamm
             else
             {
                 _restTimer = 0f;
+            }
+        }
+
+        void TickReturnToOriginalX(KebammGameManagerData gm)
+        {
+            if (!_hasOriginalX || (!_returnPending && !_returning))
+                return;
+            float delay = gm != null ? gm.MonsterReturnDelay : 0.3f;
+            float duration = gm != null ? gm.MonsterReturnDuration : 0.6f;
+            float settle = gm != null ? gm.MonsterReturnSettleSpeed : 0.5f;
+            Vector2 p = _rb.position;
+            if (_returnPending)
+            {
+                if (Time.time - _lastHitTime < delay || Mathf.Abs(_rb.linearVelocity.x) > settle || !OnGround())
+                    return;
+                _returnPending = false;
+                if (Mathf.Abs(p.x - _originalX) < 0.01f)
+                    return;
+                _returning = true;
+                _returnFromX = p.x;
+                _returnStart = Time.time;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                Debug.Log($"[Kebamm] {name} returning to spawn X {_originalX:0.00} from {p.x:0.00} ({duration}s)");
+#endif
+            }
+            // Ease-out (cubic) driven by X velocity only, so Y (gravity, landing) stays physics-driven.
+            float t = Mathf.Clamp01((Time.time - _returnStart) / duration);
+            float e = 1f - Mathf.Pow(1f - t, 3f);
+            float targetX = Mathf.Lerp(_returnFromX, _originalX, e);
+            float vx = (targetX - p.x) / Time.fixedDeltaTime;
+            _rb.linearVelocity = new Vector2(vx, _rb.linearVelocity.y);
+            if (t >= 1f)
+            {
+                _returning = false;
+                _rb.linearVelocity = new Vector2(0f, _rb.linearVelocity.y);
             }
         }
 
@@ -312,11 +366,14 @@ namespace Kebamm
             _flashRoutine = StartCoroutine(Flash());
 
             _recovering = false; // a hit interrupts the recovery hop; the delay restarts from this hit
+            _returning = false;  // a new hit restarts the return-to-spawn-X logic
+            _returnPending = _hasOriginalX;
             ApplyImpact(strength, hitX);
 
             if (_health <= 0f && !_defeated)
             {
                 _defeated = true;
+                _returnPending = _returning = false; // dead monsters keep rolling, no return
                 SetUntouchable(true);
                 if (scores)
                     KebammScore.AddDestroy(_destroyedPts);

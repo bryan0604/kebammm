@@ -30,6 +30,7 @@ namespace Kebamm
             _bootstrap = bootstrap;
             _container = container;
             DropY = dropY;
+            _hasDisplaced = false; // a ball displaced by the debug 'bomb' command does not carry into a new level
             SpawnPreview();
         }
 
@@ -243,11 +244,44 @@ namespace Kebamm
             var held = _preview;
             _preview = null;
             if (!held.IsBomb)
+            {
                 KebammCombo.OnBallDropped(); // new combo window; a Magic Bomb drop is not a drop for combo
+                KebammCombo.OnNormalDropForBombRule(_bootstrap != null ? _bootstrap.CurrentBombEveryMoves : 0); // bomb level rule
+            }
             held.transform.position = new Vector3(held.transform.position.x, DropY, 0f);
             _bootstrap.ReleasePreview(held);
             _cooldownLeft = DropCooldown;
             SpawnPreview();
+        }
+
+        // Ball displaced from the launcher by the debug 'bomb' command; it comes back right after the bomb(s).
+        bool _hasDisplaced;
+        KebammBallColour _displacedColour;
+        int _displacedTier;
+
+        /// <summary>
+        /// Debug console 'bomb N': the very next ball to leave the launcher is a Magic Bomb (the held slot becomes the bomb
+        /// now), plus N-1 more queued behind it. The displaced held ball returns after the bombs. No combo, score or save change.
+        /// </summary>
+        public void DebugLoadBombs(int count)
+        {
+            if (count <= 0 || _bootstrap == null)
+                return;
+            if (_preview != null && _preview.IsBomb)
+            {
+                KebammCombo.DebugQueueBombs(count); // a bomb is already next up; add these behind it
+                UpdateBombIndicator();
+                return;
+            }
+            if (_preview != null && !_hasDisplaced)
+            {
+                _hasDisplaced = true;
+                _displacedColour = _preview.Colour;
+                _displacedTier = _preview.Tier;
+            }
+            KebammCombo.DebugQueueBombs(count);
+            SpawnPreview(); // takes one queued bomb into the held slot
+            UpdateBombIndicator();
         }
 
         public void SpawnPreview()
@@ -261,6 +295,11 @@ namespace Kebamm
             {
                 _preview = _bootstrap.SpawnBomb(new Vector3(0f, DropY, 0f), preview: true);
                 Debug.Log($"[Kebamm] Magic Bomb loaded in the launcher ({KebammCombo.QueuedBombs} more queued)");
+            }
+            else if (_hasDisplaced)
+            {
+                _hasDisplaced = false;
+                _preview = _bootstrap.SpawnBall(new Vector3(0f, DropY, 0f), _displacedColour, _displacedTier, preview: true);
             }
             else
             {

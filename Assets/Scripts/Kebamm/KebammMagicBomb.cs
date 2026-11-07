@@ -46,9 +46,9 @@ namespace Kebamm
         }
 
         static KebammGameManagerData Gm => KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
-        static float Delay() => Gm != null ? Gm.BombTouchDelay : 1.2f;
+        static float Delay() => Gm != null ? Gm.MagicBombTouchDelay : 1.2f;
 
-        static float Range() => Gm != null ? Gm.BombExplodeRange : 8f;
+        static float Range() => Gm != null ? Gm.MagicBombExplodeRange : 8f;
 
         /// <summary>Circle of diameter 2 x bomb_explode_range (OverlapCircleAll uses range as a radius).</summary>
         void ShowOverlay()
@@ -130,8 +130,8 @@ namespace Kebamm
             _exploded = true;
             var gm = Gm;
             float range = Range();
-            int damage = gm != null ? gm.BombExplodeDamage : 10;
-            int strength = gm != null ? gm.BombExplodeStrength : 3;
+            int damage = gm != null ? gm.MagicBombExplodeDamage : 10;
+            int strength = gm != null ? gm.MagicBombExplodeStrength : 3;
             Vector2 centre = transform.position;
 
             Hits.Clear();

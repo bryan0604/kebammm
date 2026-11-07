@@ -15,6 +15,6 @@ MonoBehaviour:
   id: 2
   hp: 500
   tier: 3
-  hitPts: 52
+  hitPts: 37
   destroyedPts: 1000
   size: 0.9

@@ -40,6 +40,7 @@ namespace Kebamm.EditorTools
             BuildSummary s = report.summary;
             Debug.Log($"[KebammBuild] Result={s.result} Size={s.totalSize} Time={s.totalTime} Errors={s.totalErrors} Warnings={s.totalWarnings}");
             NotifyTelegram(report);
+            KebammNotionBuildLog.Post(report, ApkPath);
             if (Application.isBatchMode)
                 EditorApplication.Exit(s.result == BuildResult.Succeeded ? 0 : 1);
         }

@@ -67,6 +67,8 @@ namespace Kebamm
         public float GroundWidth = 8f;
         public float GroundThickness = 0.35f;
         public float SpawnInset = 0.35f;
+        [Tooltip("Extra margin (world units) kept between a spawned monster and the left/right edge of the camera view.")]
+        public float ScreenSpawnMargin = 0.15f;
 
         KebammContainer _container;
         KebammCapacityMonitor _capacity;
@@ -86,6 +88,8 @@ namespace Kebamm
         int _levelIndex;
         KebammMainMenu _mainMenu;
 
+        /// <summary>Launcher of the current level (null before a level is built).</summary>
+        public KebammDropController DropController => _dropper;
         public bool InMainMenu => _mainMenu != null && _mainMenu.IsVisible;
 
         /// <summary>True while the dev console is open; ball drops and the R reset ignore input.</summary>
@@ -501,13 +505,12 @@ namespace Kebamm
                     size = 0.05f;
 
                 KebammBallColour colour = RandomLevelColour();
-                float reach = halfPlatform - size * 0.5f - SpawnInset;
-                if (reach < 0f)
-                    reach = 0f;
+                // Spawn X range: platform (minus SpawnInset) and the visible camera width (any phone aspect), whichever is tighter.
+                SpawnRangeX(size, halfPlatform, out float spawnMin, out float spawnMax);
                 // Ground spawns avoid existing stacks' footprints so physics never pushes a stack sideways at spawn.
-                float x = Random.Range(-reach, reach);
+                float x = Random.Range(spawnMin, spawnMax);
                 for (int attempt = 0; attempt < 12 && OverlapsStack(stacks, x, size); attempt++)
-                    x = Random.Range(-reach, reach);
+                    x = Random.Range(spawnMin, spawnMax);
                 // Square sprite pivot is center, so lift by half the uniform scale to rest on the ground.
                 float y = groundTop + size * 0.5f;
 
@@ -529,7 +532,8 @@ namespace Kebamm
                         float candidateY = topY + StackGap + size * 0.5f;
                         // Whole body must stay inside the platform with the SpawnInset margin (never at the edge).
                         float stackX = MonsterCenterX(candidate[0]);
-                        if (candidateY + size * 0.5f <= stackCeiling && Mathf.Abs(stackX) <= halfPlatform - size * 0.5f - SpawnInset)
+                        SpawnRangeX(size, halfPlatform, out float stackMin, out float stackMax);
+                        if (candidateY + size * 0.5f <= stackCeiling && stackX >= stackMin - 0.001f && stackX <= stackMax + 0.001f)
                         {
                             target = candidate;
                             // Same X as the bottom monster's collider centre (new monster's collider offset is 0); only Y rises.
@@ -542,6 +546,7 @@ namespace Kebamm
                 }
 
                 KebammMonster monster = SpawnMonster(data, size, colour, new Vector3(x, y, 0f));
+                monster.SetOriginalX(x); // knocked-back living monsters slide back here
                 _monsters.Add(monster);
                 if (target != null)
                 {
@@ -552,8 +557,26 @@ namespace Kebamm
                 }
                 else
                     stacks.Add(new List<KebammMonster> { monster });
-                Debug.Log($"[Kebamm] Spawned {monster.name} tier={data.tier} hp={data.hp} colour={colour} size={size} x={x:0.00} y={y:0.00} stack={(target != null ? target.Count : 1)}");
+                Debug.Log($"[Kebamm] Spawned {monster.name} tier={data.tier} hp={monster.MaxHealth} (base {data.hp}) colour={colour} size={size} x={x:0.00} y={y:0.00} stack={(target != null ? target.Count : 1)}");
             }
+        }
+
+        /// <summary>X range for a monster centre of this size: inside the platform (SpawnInset) and inside the camera view (ScreenSpawnMargin).</summary>
+        void SpawnRangeX(float size, float halfPlatform, out float min, out float max)
+        {
+            float half = size * 0.5f;
+            min = -halfPlatform + half + SpawnInset;
+            max = halfPlatform - half - SpawnInset;
+            Camera cam = Camera.main;
+            if (cam != null && cam.orthographic)
+            {
+                float halfView = cam.orthographicSize * cam.aspect;
+                float cx = cam.transform.position.x;
+                min = Mathf.Max(min, cx - halfView + half + ScreenSpawnMargin);
+                max = Mathf.Min(max, cx + halfView - half - ScreenSpawnMargin);
+            }
+            if (min > max)
+                min = max = (min + max) * 0.5f;
         }
 
         const int MaxMonsterStack = 5;
@@ -781,7 +804,14 @@ namespace Kebamm
             mRb.sharedMaterial = KebammMonster.SharedMaterial;
             monsterGo.GetComponent<BoxCollider2D>().sharedMaterial = KebammMonster.SharedMaterial;
             var monster = monsterGo.AddComponent<KebammMonster>();
-            float hp = data != null ? data.hp : 100f;
+            float baseHp = data != null ? data.hp : 100f;
+            // Level monster HP modifier (Level Data monster_hp_modifier): base tier HP x modifier, rounded, min 1.
+            KebammLevel lvl = CurrentLevel;
+            float hp = lvl != null ? lvl.ModifiedMonsterHp(baseHp) : baseHp;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (lvl != null && !Mathf.Approximately(lvl.MonsterHpModifier, 1f))
+                Debug.Log($"[Kebamm] Monster HP {baseHp} x level modifier {lvl.MonsterHpModifier} = {hp}");
+#endif
             int hitPts;
             int destroyedPts;
             if (data != null)
@@ -798,16 +828,18 @@ namespace Kebamm
 
         static KebammMonsterData[] CreateFallbackMonsters()
         {
-            int[] ids = { 0, 1, 2 };
-            float[] hps = { 70f, 150f, 350f }; // Notion Monster Tier Data hp (v14)
-            int[] tiers = { 1, 2, 3 };
-            int[] hitPts = { 13, 26, 52 };
-            int[] destroyedPts = { 250, 500, 1000 };
+            int[] ids = { 0, 1, 2, 3, 4 };
+            float[] hps = { 70f, 150f, 350f, 500f, 1000f }; // Notion Monster Tier Data hp (tiers 4-5 added v24)
+            int[] tiers = { 1, 2, 3, 4, 5 };
+            int[] hitPts = { 13, 26, 37, 48, 52 }; // matches Notion Monster Tier Data hit_pts
+            int[] destroyedPts = { 250, 500, 1000, 2000, 4000 };
             string[] names =
             {
                 "monster_01_basic_tier_01",
                 "monster_01_basic_tier_02",
-                "monster_01_basic_tier_03"
+                "monster_01_basic_tier_03",
+                "monster_01_basic_tier_04",
+                "monster_01_basic_tier_05"
             };
 
             var result = new KebammMonsterData[ids.Length];
@@ -840,6 +872,12 @@ namespace Kebamm
 
         KebammLevel CurrentLevel =>
             _levelIndex >= 0 && _levelIndex < _activeLevels.Count ? _activeLevels[_levelIndex] : null;
+
+        /// <summary>Current level's bomb rule (Level Data bomb_every_moves); 0 = off.</summary>
+        public int CurrentBombEveryMoves => CurrentLevel != null ? CurrentLevel.BombEveryMoves : 0;
+
+        /// <summary>Current level's combo bar progress modifier (Level Data combo_progress_modifier); 1 when no level / unset.</summary>
+        public float CurrentComboProgressModifier => CurrentLevel != null ? CurrentLevel.ComboProgressModifier : 1f;
 
         /// <summary>The level's prepopulateBallColours, or the full ColourPool if none are set.</summary>
         KebammBallColour[] CurrentColourPool()
@@ -922,7 +960,7 @@ namespace Kebamm
             KebammScore.CountBall(tier);
             Debug.Log($"[Kebamm] Merged -> {colour} T{tier} at {position}");
             KebammScore.AddMerge(KebammBallTierData.MergePointsForPlayTier(tier));
-            KebammCombo.OnMerge(position);
+            KebammCombo.OnMerge(position, CurrentComboProgressModifier);
         }
 
         public void SetDroppingEnabled(bool enabled)
@@ -949,6 +987,7 @@ namespace Kebamm
             {
                 _bombingRun = true;
                 _bombingIdleTimer = 0f;
+                KebammBall.SetBombingRunGravityAll(true); // Ball Tier Data bombing_run_gravity_scale
                 Debug.Log("[Kebamm] Bombing run started from capacity release. Score screen after 5s with no gameplay event.");
             }
 
@@ -1047,6 +1086,7 @@ namespace Kebamm
             ResumeGame("main menu");
             _bombingRun = false;
             _bombingIdleTimer = 0f;
+            KebammBall.SetBombingRunGravityAll(false);
             _dropper?.SetDroppingEnabled(false);
             _dropper?.ClearPreview();
             if (_mainMenu != null)
@@ -1104,6 +1144,7 @@ namespace Kebamm
             ResumeGame("session reset");
             _bombingRun = false;
             _bombingIdleTimer = 0f;
+            KebammBall.SetBombingRunGravityAll(false);
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.HideEnd();
             KebammScore.ResetScores();

@@ -23,6 +23,9 @@ namespace Kebamm
         public float FloorY { get; private set; }
 
         Transform _wallL, _wallR, _floor, _line;
+        SpriteRenderer _panelSr;
+        /// <summary>Jar panel sorting: above the level background (-100), below everything else (ground -1, balls 10+, base 2, pillars 3).</summary>
+        public const int JarPanelSortingOrder = -50;
         SpriteRenderer _artL, _artR;
         float _floorTopY;
 
@@ -68,6 +71,13 @@ namespace Kebamm
             lineSr.color = new Color(1f, 0.35f, 0.2f, 0.65f);
             lineSr.sortingOrder = 5;
 
+            // Jar panel: see-through white fill of the jar play area (visual only, no collider).
+            var panelGo = new GameObject("JarPanel");
+            panelGo.transform.SetParent(transform, false);
+            _panelSr = panelGo.AddComponent<SpriteRenderer>();
+            _panelSr.sprite = KebammVisualFactory.SquareSprite;
+            _panelSr.sortingOrder = JarPanelSortingOrder;
+
             Layout(width, height, wallThickness, capsLineHeight);
             IsOpen = false;
         }
@@ -97,6 +107,23 @@ namespace Kebamm
             {
                 _floorSr.transform.localScale = new Vector3(1f / floorSize.x, 1f / floorSize.y, 1f);
                 _floorSr.size = floorSize;
+            }
+
+            if (_panelSr != null)
+            {
+                var gm = KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
+                float pad = gm != null ? gm.jarPanelPadding : 0f;
+                _panelSr.color = gm != null ? gm.jarPanelColor : new Color(1f, 1f, 1f, 0.1f);
+                // No gap: pillar.png is 50 px wide but only x 14-35 is opaque, so its visible inner edge sits 28% of the wall
+                // thickness inside the collider edge; base.png's top 4 of 50 px are transparent too. Tuck the panel under the
+                // pillars and base to their centre lines (always opaque, drawn on top) so it meets them at any jar size.
+                float tuck = wallThickness * 0.5f;
+                float left = x - InnerHalfWidth - tuck - pad;
+                float right = x + InnerHalfWidth + tuck + pad;
+                float bottom = _floorTopY - tuck - pad;
+                float top = TopY + pad;
+                _panelSr.transform.position = new Vector3((left + right) * 0.5f, (bottom + top) * 0.5f, 0f);
+                _panelSr.transform.localScale = new Vector3(Mathf.Max(0f, right - left), Mathf.Max(0f, top - bottom), 1f);
             }
 
             _line.position = new Vector3(x, CapacityY, 0f);
