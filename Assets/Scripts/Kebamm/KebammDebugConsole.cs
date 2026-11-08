@@ -12,7 +12,7 @@ namespace Kebamm
     /// Developer cheat console (GDD: Debug Console). Backquote opens/closes on desktop/Editor,
     /// three-finger hold on mobile: 3+ fingers currently in the top 37.5% of the screen, held for more than 5 s.
     /// Compiled only in the Editor and development builds.
-    /// Commands: jump N, next, prev, restart, win, save, deletesave [confirm], unlockall, setstars N S, bomb [N], help.
+    /// Commands: start N, jump N, next, prev, restart, win, save, deletesave [confirm], unlockall, setstars N S, bomb [N], help.
     /// </summary>
     public class KebammDebugConsole : MonoBehaviour
     {
@@ -281,15 +281,16 @@ namespace Kebamm
             switch (name)
             {
                 case "help":
-                    Print("jump N | next | prev | restart | win | bomb [N] | help");
+                    Print("start N / jump N (keeps other level progress) | next | prev | restart | win | bomb [N] | help");
                     Print("save | deletesave | unlockall | setstars N S");
                     Print("Levels: " + b.LevelNumbersText);
                     break;
 
+                case "start":
                 case "jump":
                     if (parts.Length != 2 || !int.TryParse(parts[1], out int n))
                     {
-                        Error("Usage: jump N");
+                        Error($"Usage: {name} N");
                         return;
                     }
                     if (!b.TryGetLevelIndex(n, out int index))
@@ -297,7 +298,7 @@ namespace Kebamm
                         Error($"No active level {n}. Levels: {b.LevelNumbersText}");
                         return;
                     }
-                    GoTo(b, index, $"Jumping to level {n}");
+                    GoTo(b, index, $"Starting level {n} without changing other level progress.");
                     break;
 
                 case "next":

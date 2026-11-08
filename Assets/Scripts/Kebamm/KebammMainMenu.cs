@@ -53,6 +53,8 @@ namespace Kebamm
         UnityEngine.UI.Button _musicButton;
         TextMeshProUGUI _playerName;
         TextMeshProUGUI _playerStars;
+        TextMeshProUGUI _playerCoins;
+        int _shownCoins = -1;
         string _shownName;
         int _shownStars = -1;
         TextMeshProUGUI _updateText;
@@ -432,18 +434,28 @@ namespace Kebamm
             RectTransform pr = panel.rectTransform;
             pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(0f, 1f);
             pr.anchoredPosition = new Vector2(30f, -30f);
-            pr.sizeDelta = new Vector2(500f, 150f);
+            pr.sizeDelta = new Vector2(500f, 200f);
 
             var picture = KebammPlaceholderUi.Box(panel.transform, "PlayerPicture", new Color(0.85f, 0.80f, 0.95f), false);
             picture.sprite = KebammVisualFactory.CircleSprite;
             picture.preserveAspect = true;
             KebammPlaceholderUi.Place(picture.rectTransform, new Vector2(-170f, 0f), new Vector2(120f, 120f));
 
-            _playerName = KebammPlaceholderUi.Label(panel.transform, "Username", "", 38f, new Vector2(70f, 28f), new Vector2(330f, 56f), Color.white);
+            _playerName = KebammPlaceholderUi.Label(panel.transform, "Username", "", 38f, new Vector2(70f, 55f), new Vector2(330f, 56f), Color.white);
             _playerName.alignment = TextAlignmentOptions.Left;
             _playerName.fontStyle = FontStyles.Bold;
-            _playerStars = KebammPlaceholderUi.Label(panel.transform, "Stars", "", 34f, new Vector2(70f, -32f), new Vector2(330f, 50f), new Color(1f, 0.86f, 0.3f));
+            var starIcon = KebammPlaceholderUi.Box(panel.transform, "StarIcon", Color.white, false);
+            starIcon.sprite = Resources.Load<Sprite>("Kebamm/UI/star_icon");
+            starIcon.preserveAspect = true;
+            KebammPlaceholderUi.Place(starIcon.rectTransform, new Vector2(-75f, 5f), new Vector2(40f, 40f));
+            _playerStars = KebammPlaceholderUi.Label(panel.transform, "Stars", "", 34f, new Vector2(100f, 5f), new Vector2(300f, 50f), new Color(1f, 0.86f, 0.3f));
             _playerStars.alignment = TextAlignmentOptions.Left;
+            var coinIcon = KebammPlaceholderUi.Box(panel.transform, "CoinIcon", Color.white, false);
+            coinIcon.sprite = Resources.Load<Sprite>("Kebamm/UI/coin_icon");
+            coinIcon.preserveAspect = true;
+            KebammPlaceholderUi.Place(coinIcon.rectTransform, new Vector2(-75f, -50f), new Vector2(40f, 40f));
+            _playerCoins = KebammPlaceholderUi.Label(panel.transform, "Coins", "", 34f, new Vector2(100f, -50f), new Vector2(300f, 50f), new Color(1f, 0.86f, 0.3f));
+            _playerCoins.alignment = TextAlignmentOptions.Left;
             RefreshPlayerPanel();
         }
 
@@ -455,12 +467,15 @@ namespace Kebamm
             if (string.IsNullOrEmpty(name))
                 name = "Player...";
             int stars = KebammSaveSystem.TotalStars();
-            if (name == _shownName && stars == _shownStars)
+            int coins = KebammSaveSystem.Coins;
+            if (name == _shownName && stars == _shownStars && coins == _shownCoins)
                 return;
             _shownName = name;
             _shownStars = stars;
+            _shownCoins = coins;
             _playerName.text = name;
             _playerStars.text = "Stars: " + stars;
+            _playerCoins.text = "Coins: " + coins;
         }
 
         // PLACEHOLDER Settings popup (Notion: Main Menu > Setting Screen Popup): Sound, Music, Delete Save,

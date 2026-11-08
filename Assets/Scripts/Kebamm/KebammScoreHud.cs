@@ -21,8 +21,8 @@ namespace Kebamm
         TextMeshProUGUI _endNextLevelValue;
         readonly Image[] _stars = new Image[3];
 
-        // Placeholder white star, tinted grey (unearned) or yellow (earned) from score_screen_config. Replace at polish.
-        const string StarSpritePath = "Kebamm/UI/star_placeholder";
+        // Art Document "Star Resource" icon, tinted grey (unearned) or yellow (earned) from score_screen_config.
+        const string StarSpritePath = "Kebamm/UI/star_icon";
         static Sprite _starSprite;
         GameObject _nextButton;
         Sequence _endSequence;
@@ -31,6 +31,7 @@ namespace Kebamm
         TextMeshProUGUI _endFinalValue;
         TextMeshProUGUI _endCoinsLabel;
         TextMeshProUGUI _endCoinsValue;
+        Image _endCoinsIcon;
         Tween _coinCountTween;
 
         /// <summary>Coins earned by the last finished attempt (score screen, save and log all use this).</summary>
@@ -244,13 +245,17 @@ namespace Kebamm
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(900f, 56f));
             _endFinalValue = CreateLabel(_endRoot.transform, "EndFinalValue", "0", 96f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(900f, 130f));
-            // Rewards Earn (placeholder text, no final art): coins earned this level, counts up from 0.
+            // Rewards Earn: Art Document coin icon and coins earned this level, counting up from 0.
             _endCoinsLabel = CreateLabel(_endRoot.transform, "EndCoinsLabel", "Coins Earned", 36f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -225f), new Vector2(900f, 56f));
             _endCoinsLabel.color = CoinTextColor;
             _endCoinsValue = CreateLabel(_endRoot.transform, "EndCoinsValue", "+0", 60f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -290f), new Vector2(900f, 80f));
+                new Vector2(0.5f, 0.5f), new Vector2(40f, -290f), new Vector2(220f, 80f));
             _endCoinsValue.color = CoinTextColor;
+            _endCoinsIcon = KebammPlaceholderUi.Box(_endRoot.transform, "EndCoinsIcon", Color.white, false);
+            _endCoinsIcon.sprite = Resources.Load<Sprite>("Kebamm/UI/coin_icon");
+            _endCoinsIcon.preserveAspect = true;
+            KebammPlaceholderUi.Place(_endCoinsIcon.rectTransform, new Vector2(-110f, -290f), new Vector2(56f, 56f));
             _endNextLevelValue = CreateLabel(_endRoot.transform, "EndNextLevelValue", "Next: Level 1", 34f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -370f), new Vector2(900f, 56f));
 
@@ -454,6 +459,8 @@ namespace Kebamm
 
         void SetCoinsVisible(bool visible)
         {
+            if (_endCoinsIcon != null)
+                _endCoinsIcon.gameObject.SetActive(visible);
             if (_endCoinsLabel != null)
                 _endCoinsLabel.gameObject.SetActive(visible);
             if (_endCoinsValue != null)
@@ -578,7 +585,7 @@ namespace Kebamm
             return image;
         }
 
-        // Loads Resources/Kebamm/UI/star_placeholder as a Sprite. If it was imported as a plain texture,
+        // Loads Resources/Kebamm/UI/star_icon as a Sprite. If it was imported as a plain texture,
         // wrap it in a sprite; if it is missing, draw a white star at runtime.
         static Sprite StarSprite
         {
@@ -596,7 +603,7 @@ namespace Kebamm
                 }
                 if (_starSprite == null)
                 {
-                    Debug.LogWarning("[Kebamm] star_placeholder missing from Resources/Kebamm/UI; drawing a star at runtime.");
+                    Debug.LogWarning("[Kebamm] star_icon missing from Resources/Kebamm/UI; drawing a star at runtime.");
                     _starSprite = BuildStarSprite(128);
                 }
                 return _starSprite;
