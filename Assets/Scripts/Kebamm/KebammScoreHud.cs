@@ -21,9 +21,34 @@ namespace Kebamm
         TextMeshProUGUI _endNextLevelValue;
         readonly Image[] _stars = new Image[3];
 
-        // Art Document "Star Resource" icon, tinted grey (unearned) or yellow (earned) from score_screen_config.
+        // Art Document "Star Resource" icon for earned stars (shown untinted).
         const string StarSpritePath = "Kebamm/UI/star_icon";
         static Sprite _starSprite;
+        // Art Document "Star Resource Empty": shown untinted for stars not obtained yet.
+        const string EmptyStarSpritePath = "Kebamm/UI/star_icon_empty";
+        static Sprite _emptyStarSprite;
+
+        static Sprite EmptyStarSprite
+        {
+            get
+            {
+                if (_emptyStarSprite != null)
+                    return _emptyStarSprite;
+                _emptyStarSprite = Resources.Load<Sprite>(EmptyStarSpritePath);
+                if (_emptyStarSprite == null)
+                {
+                    Texture2D tex = Resources.Load<Texture2D>(EmptyStarSpritePath);
+                    if (tex != null)
+                        _emptyStarSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 0.5f), 100f);
+                }
+                if (_emptyStarSprite == null)
+                {
+                    Debug.LogWarning("[Kebamm] star_icon_empty missing from Resources/Kebamm/UI; using star_icon for unearned stars.");
+                    _emptyStarSprite = StarSprite;
+                }
+                return _emptyStarSprite;
+            }
+        }
         GameObject _nextButton;
         Sequence _endSequence;
         TextMeshProUGUI _endMergeValue;
@@ -507,7 +532,8 @@ namespace Kebamm
                 _endMonsterValue.gameObject.SetActive(visible);
         }
 
-        // Unearned stars show grey straight away; earned stars turn yellow and wait at scale 0 for the pop.
+        // _stars[] are the filled Star Resource overlays. The empty base under each always stays visible;
+        // every overlay starts hidden at scale 0 and only earned ones pop in on top. No tint.
         void PrepareStars(int earned)
         {
             KillStarTweens();
@@ -518,9 +544,9 @@ namespace Kebamm
                 if (star == null)
                     continue;
 
-                bool isEarned = i < earned;
-                star.color = isEarned ? config.starEarnedColor : config.starUnearnedColor;
-                star.transform.localScale = isEarned ? Vector3.zero : Vector3.one;
+                star.sprite = StarSprite;
+                star.color = Color.white;
+                star.transform.localScale = Vector3.zero;
             }
         }
 
@@ -562,8 +588,10 @@ namespace Kebamm
             {
                 if (_stars[i] == null)
                     continue;
-                _stars[i].transform.localScale = Vector3.one;
-                _stars[i].color = KebammScoreScreenConfig.Load().starUnearnedColor;
+                // Hide the filled overlay; the empty base (parent) stays at full size.
+                _stars[i].transform.localScale = Vector3.zero;
+                _stars[i].sprite = StarSprite;
+                _stars[i].color = Color.white;
             }
         }
 
@@ -577,10 +605,27 @@ namespace Kebamm
             rect.pivot = new Vector2(0.5f, 0.5f);
             rect.anchoredPosition = anchored;
             rect.sizeDelta = new Vector2(size, size);
-            var image = go.AddComponent<Image>();
+            // Base layer: Star Resource Empty, always visible at full size.
+            var baseImage = go.AddComponent<Image>();
+            baseImage.sprite = EmptyStarSprite;
+            baseImage.preserveAspect = true;
+            baseImage.color = Color.white;
+            baseImage.raycastTarget = false;
+
+            // Top layer: filled Star Resource as a child (draws above the base), same rect, hidden until popped.
+            var fillGo = new GameObject(starName + "Filled");
+            fillGo.transform.SetParent(go.transform, false);
+            var fillRect = fillGo.AddComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.pivot = new Vector2(0.5f, 0.5f);
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            fillRect.localScale = Vector3.zero;
+            var image = fillGo.AddComponent<Image>();
             image.sprite = StarSprite;
             image.preserveAspect = true;
-            image.color = KebammScoreScreenConfig.Load().starUnearnedColor;
+            image.color = Color.white;
             image.raycastTarget = false;
             return image;
         }
