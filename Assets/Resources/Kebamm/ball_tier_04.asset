@@ -20,3 +20,4 @@ MonoBehaviour:
   ballSize: 1.4
   impactAoeRange: 1.4
   bombingRunGravityScale: 1.4
+  impactUpwardMultiplier: 1

@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a3c51e2b9d84f0fa6c2e18d4b5f9a31, type: 3}
+  m_Name: siege_data
+  m_EditorClassIdentifier: 
+  trebuchetId: trebuchet_01
+  trebuchetName: Trebuchet
+  trebuchetHp: 100
+  trebuchetScale: 1
+  trebuchetEdgeMargin: 0.35
+  rockId: rock_01
+  rockName: Rock
+  rockHp: 10
+  rockScale: 0.6
+  rockMass: 6
+  rockGravityMultiplier: 1.5

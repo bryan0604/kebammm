@@ -41,8 +41,18 @@ namespace Kebamm
                             continue; // dead monsters are untouchable: no damage, no push
                         if (m != directTarget && Hit.Add(m))
                         {
-                            m.ReceiveHit(damage, strength, point.x, "explosion");
+                            m.ReceiveHit(damage, strength, point.x, "explosion", ball.ImpactUpwardMultiplier); // upward part scaled per tier
                             monsters++;
+                        }
+                        continue;
+                    }
+                    var tb = c.GetComponentInParent<KebammTrebuchet>();
+                    if (tb != null)
+                    {
+                        if (tb != directTarget && Hit.Add(tb))
+                        {
+                            tb.ReceiveHit(damage, "explosion"); // obstacle rule, no push (stationary)
+                            obstacles++;
                         }
                         continue;
                     }

@@ -232,6 +232,17 @@ namespace Kebamm
                 Debug.Log("[KebammSave] Username will be created when the online check returns.");
         }
 
+        /// <summary>Debug console resetprogress confirm: progression back to a fresh state, then the main menu at level 1.</summary>
+        public void ResetProgressAndRestart()
+        {
+            KebammSaveSystem.ResetProgress();
+            _levelIndex = 0;
+            if (KebammScoreHud.Instance != null)
+                KebammScoreHud.Instance.RefreshLevel();
+            ResetSession();   // abandons any running level (also hides the score screen); nothing is recorded
+            ShowMainMenu();   // menu re-reads stars, coins and the level on Show
+        }
+
         public int LastLevelNumber => LevelNumberAt(Mathf.Max(0, _activeLevels.Count - 1));
 
         void OnDestroy()
@@ -311,6 +322,9 @@ namespace Kebamm
         /// <summary>Active Game Manager data (remote override copy or the asset); null if missing.</summary>
         public KebammGameManagerData GameManagerData => _gameManager;
         public KebammContainer Container => _container;
+        /// <summary>Parent of every jar ball (and trebuchet rocks); cleared on ResetSession.</summary>
+        public Transform BallsRoot => _ballsRoot;
+        KebammTrebuchet _trebuchet;
         /// <summary>Monsters spawned in the current level (stars: killed / total).</summary>
         public int MonstersInLevel => _monsters.Count;
         bool _layoutDirty;
@@ -410,6 +424,7 @@ namespace Kebamm
                 gSr.enabled = false;
 
             SpawnMonsters();
+            _trebuchet = KebammTrebuchet.Create(this, _worldRoot);
 
             var dropGo = new GameObject("DropController");
             dropGo.transform.SetParent(_worldRoot, false);
@@ -796,7 +811,7 @@ namespace Kebamm
             mRb.bodyType = RigidbodyType2D.Dynamic;
             mRb.simulated = true;
             mRb.gravityScale = 1.4f;
-            mRb.mass = 2f;
+            mRb.mass = data != null ? data.ResolveWeight() : KebammMonsterData.DefaultWeight; // Monster Tier Data weight (default 2)
             mRb.linearDamping = 0.2f;
             mRb.angularDamping = 3f;
             mRb.interpolation = RigidbodyInterpolation2D.Interpolate;
@@ -1089,6 +1104,8 @@ namespace Kebamm
             KebammBall.SetBombingRunGravityAll(false);
             _dropper?.SetDroppingEnabled(false);
             _dropper?.ClearPreview();
+            if (_trebuchet != null)
+                _trebuchet.ResetForLevel(null);
             if (_mainMenu != null)
                 _mainMenu.Show();
             ApplyRemoteDataIfPending();
@@ -1160,6 +1177,8 @@ namespace Kebamm
             _container?.CloseFloor();
             // Respawn so count, colours and tiers follow the current level.
             SpawnMonsters();
+            if (_trebuchet != null)
+                _trebuchet.ResetForLevel(CurrentLevel); // trebuchet + rock state is per level attempt
 
             _dropper?.ClearPreview();
             _dropper?.SetDroppingEnabled(true);

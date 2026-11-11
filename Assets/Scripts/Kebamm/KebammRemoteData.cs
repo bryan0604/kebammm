@@ -285,6 +285,15 @@ namespace Kebamm
             SetInt(row, "bomb_every_moves", n, "bombEveryMoves", ref l.bombEveryMoves); // missing = asset value (0 = off)
             SetFloat(row, "combo_progress_modifier", n, "comboProgressModifier", ref l.comboProgressModifier); // missing = asset value (default 1); non-positive treated as 1 at runtime
             SetString(row, "type_level", n, "typeLevel", ref l.typeLevel); // label only
+            // Trebuchet (Y/X/Z/W/T). Missing/blank = asset value (defaults 15/5/1/5/2); runtime treats invalid values as defaults.
+            SetBool(row, "trebuchet_enabled", n, "trebuchetEnabled", ref l.trebuchetEnabled); // missing/blank = asset value (on)
+            SetInt(row, "trebuchet_start_drops", n, "trebuchetStartDrops", ref l.trebuchetStartDrops);
+            SetInt(row, "trebuchet_stage_drops", n, "trebuchetStageDrops", ref l.trebuchetStageDrops);
+            SetInt(row, "trebuchet_stage_gain", n, "trebuchetStageGain", ref l.trebuchetStageGain);
+            SetInt(row, "trebuchet_launch_drops", n, "trebuchetLaunchDrops", ref l.trebuchetLaunchDrops);
+            SetInt(row, "rock_destroy_count", n, "rockDestroyCount", ref l.rockDestroyCount);
+            SetFloat(row, "rock_size", n, "rockSize", ref l.rockSize); // blank = asset value; non-positive falls back to siege_data rock scale at runtime
+            SetInt(row, "trebuchet_min_monsters", n, "trebuchetMinMonsters", ref l.trebuchetMinMonsters); // blank = asset value; non-positive falls back to 5 at runtime
             return l;
         }
 
@@ -301,6 +310,7 @@ namespace Kebamm
             SetFloat(row, "hp", n, "hp", ref b.hp);
             SetInt(row, "merge_pts", n, "mergePts", ref b.mergePts);
             SetFloat(row, "impact_strength", n, "impactStrength", ref b.impactStrength);
+            SetFloat(row, "impact_upward_multiplier", n, "impactUpwardMultiplier", ref b.impactUpwardMultiplier); // missing/blank = asset value (1)
             SetFloat(row, "impact_aoe_range", n, "impactAoeRange", ref b.impactAoeRange);
             SetFloat(row, "bombing_run_gravity_scale", n, "bombingRunGravityScale", ref b.bombingRunGravityScale);
             return b;
@@ -316,6 +326,7 @@ namespace Kebamm
             var m = CopyOf(asset);
             string n = asset.name;
             SetFloat(row, "size", n, "size", ref m.size);
+            SetFloat(row, "weight", n, "weight", ref m.weight); // missing/blank = asset value (2); <= 0 resolves to 2
             // Notion "hp" is monster HP; "hit_pts" is the per-hit score (since v27; before v5 it meant HP, no longer mapped to hp).
             SetFloat(row, "hp", n, "hp", ref m.hp);
             SetInt(row, "hit_pts", n, "hitPts", ref m.hitPts);
@@ -401,7 +412,7 @@ namespace Kebamm
 
         static void SetInt(Dictionary<string, object> row, string key, string asset, string field, ref int target)
         {
-            if (!row.TryGetValue(key, out object v)) return;
+            if (!row.TryGetValue(key, out object v) || v == null) return; // missing or blank = keep the asset value
             if (!(v is double d) || Math.Abs(d - Math.Round(d)) > 1e-6) { Debug.LogWarning($"{LogTag} {asset}.{key} is not a whole number; kept {target}."); return; }
             SetLog(asset, field, target, (int)Math.Round(d));
             target = (int)Math.Round(d);
@@ -417,7 +428,7 @@ namespace Kebamm
 
         static void SetBool(Dictionary<string, object> row, string key, string asset, string field, ref bool target)
         {
-            if (!row.TryGetValue(key, out object v)) return;
+            if (!row.TryGetValue(key, out object v) || v == null) return; // missing or blank = keep the asset value
             if (!(v is bool b)) { Debug.LogWarning($"{LogTag} {asset}.{key} is not true/false; kept {target}."); return; }
             SetLog(asset, field, target, b);
             target = b;

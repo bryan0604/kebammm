@@ -18,6 +18,8 @@ namespace Kebamm
         public float impactAoeRange = -1f;
         [Tooltip("Rigidbody2D gravity scale for balls of this tier while the bombing run is active (container floor open). Notion bombing_run_gravity_scale. Normal play uses 1.4. Lower = falls slower. <= 0 = normal gravity.")]
         public float bombingRunGravityScale = 1.4f;
+        [Tooltip("Multiplies only the UPWARD (+Y) part of the push this tier gives a monster it hits (direct hit and impact explosion). Sideways and downward are unchanged. Notion impact_upward_multiplier. 1 = unchanged, 0 = no upward push, negative = 0.")]
+        public float impactUpwardMultiplier = 1f;
 
         static Dictionary<int, KebammBallTierData> _byTier;
         // Built-in fallbacks when a tier row is missing (Notion Ball Tier Data v14).
@@ -77,6 +79,13 @@ namespace Kebamm
             if (row != null && row.impactStrength > 0f)
                 return row.impactStrength;
             return 2f + dataTier * 0.5f;
+        }
+
+        /// <summary>Upward push multiplier for a code tier (0-based): row value clamped to 0 or more; missing row = 1.</summary>
+        public static float ImpactUpwardMultiplierForPlayTier(int playTier)
+        {
+            KebammBallTierData row = RowFor(playTier, out _);
+            return row != null ? Mathf.Max(0f, row.impactUpwardMultiplier) : 1f;
         }
 
         /// <summary>Impact explosion radius for a code tier (0-based). T6 uses ball_tier_06 (T5 row if missing).</summary>

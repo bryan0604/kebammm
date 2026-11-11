@@ -45,3 +45,11 @@ MonoBehaviour:
   typeLevel: ""
   bombEveryMoves: 0
   comboProgressModifier: 1
+  trebuchetStartDrops: 15
+  trebuchetStageDrops: 5
+  trebuchetStageGain: 1
+  trebuchetLaunchDrops: 5
+  rockDestroyCount: 2
+  rockSize: 0.6
+  trebuchetEnabled: 1
+  trebuchetMinMonsters: 5

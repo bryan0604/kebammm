@@ -18,3 +18,4 @@ MonoBehaviour:
   hitPts: 26
   destroyedPts: 500
   size: 0.5
+  weight: 2

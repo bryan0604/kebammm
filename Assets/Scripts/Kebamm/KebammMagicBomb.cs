@@ -22,6 +22,7 @@ namespace Kebamm
         SpriteRenderer _overlay; // placeholder explosion-area circle (no collider), own root so bomb scale doesn't apply
 
         static readonly HashSet<KebammBall> Hits = new HashSet<KebammBall>();
+        static readonly HashSet<KebammRock> RockHits = new HashSet<KebammRock>();
 
         void OnCollisionEnter2D(Collision2D collision)
         {
@@ -40,6 +41,8 @@ namespace Kebamm
             var ball = col.GetComponent<KebammBall>();
             if (ball != null)
                 return !ball.IsPreview;
+            if (col.GetComponent<KebammRock>() != null)
+                return true;
             var boot = KebammPrototypeBootstrap.Instance;
             var container = boot != null ? boot.Container : null;
             return container != null && col.transform.IsChildOf(container.transform);
@@ -135,12 +138,33 @@ namespace Kebamm
             Vector2 centre = transform.position;
 
             Hits.Clear();
+            RockHits.Clear();
             foreach (Collider2D col in Physics2D.OverlapCircleAll(centre, range))
             {
                 var ball = col != null ? col.GetComponent<KebammBall>() : null;
                 if (ball != null && !ball.IsBomb && !ball.IsPreview && !ball.IsMerging)
                     Hits.Add(ball);
+                var rock = col != null ? col.GetComponent<KebammRock>() : null;
+                if (rock != null && rock.Landed)
+                    RockHits.Add(rock);
             }
+            // Trebuchet rocks take damage like balls.
+            foreach (KebammRock rock in RockHits)
+            {
+                if (rock.TakeDamage(damage))
+                {
+                    Debug.Log($"[Kebamm] Magic Bomb destroyed {rock.name}");
+                    Destroy(rock.gameObject);
+                    continue;
+                }
+                var rrb = rock.Body;
+                if (rrb == null || strength == 0)
+                    continue;
+                Vector2 rdir = (Vector2)rock.transform.position - centre;
+                rdir = rdir.sqrMagnitude > 1e-6f ? rdir.normalized : Vector2.up;
+                rrb.AddForce(rdir * strength, ForceMode2D.Impulse);
+            }
+            RockHits.Clear();
 
             int destroyed = 0, pushed = 0;
             foreach (KebammBall ball in Hits)

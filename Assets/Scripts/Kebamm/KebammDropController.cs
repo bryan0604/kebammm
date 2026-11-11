@@ -57,7 +57,8 @@ namespace Kebamm
                 _preview.gameObject.SetActive(allowDrop);
             UpdateBombIndicator();
 
-            if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked || KebammPrototypeBootstrap.IsPaused)
+            // KebammTrebuchet.TossLock: no drops while the trebuchet is tossing a rock (short).
+            if (!allowDrop || KebammPrototypeBootstrap.GameplayInputBlocked || KebammPrototypeBootstrap.IsPaused || KebammTrebuchet.TossLock)
             {
                 CancelAim(); // lifting later must not drop
                 return;
@@ -252,7 +253,9 @@ namespace Kebamm
                 KebammCombo.OnNormalDropForBombRule(_bootstrap != null ? _bootstrap.CurrentBombEveryMoves : 0); // bomb level rule
             }
             held.transform.position = new Vector3(held.transform.position.x, DropY, 0f);
-            _bootstrap.ReleasePreview(held);
+            var released = _bootstrap.ReleasePreview(held);
+            if (!held.IsBomb && KebammTrebuchet.Instance != null)
+                KebammTrebuchet.Instance.OnPlayerDrop(released); // Y/X/W drop counting; Magic Bombs never count
             _cooldownLeft = DropCooldown;
             SpawnPreview();
         }

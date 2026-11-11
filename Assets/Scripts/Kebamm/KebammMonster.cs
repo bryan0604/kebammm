@@ -175,7 +175,7 @@ namespace Kebamm
             }
         }
 
-        void ApplyImpact(float strength, float hitX)
+        void ApplyImpact(float strength, float hitX, float upwardMultiplier = 1f)
         {
             Activate();
             if (_rb == null || _rb.bodyType != RigidbodyType2D.Dynamic)
@@ -190,7 +190,8 @@ namespace Kebamm
             _knockStartX = transform.position.x;
             float s = strength;
             _rb.linearVelocity = Vector2.zero;
-            _rb.AddForce(new Vector2(side * s * SideRatio, s) * _rb.mass, ForceMode2D.Impulse);
+            // impact_upward_multiplier scales only the upward part; sideways (and spin) stay as before.
+            _rb.AddForce(new Vector2(side * s * SideRatio, s * Mathf.Max(0f, upwardMultiplier)) * _rb.mass, ForceMode2D.Impulse);
             // Flying right spins clockwise (negative Z), flying left counter-clockwise.
             _rb.angularVelocity = Mathf.Clamp(-side * s * SpinPerStrength, -MaxSpin, MaxSpin);
             _restTimer = 0f;
@@ -334,13 +335,13 @@ namespace Kebamm
                 return; // dead monsters are untouchable (collision is ignored; guard only)
             Vector2 point = collision.contactCount > 0 ? collision.GetContact(0).point : (Vector2)ball.transform.position;
             ball.TakeDamage(ball.Damage); // kept for the log; the ball is removed on contact whatever its HP
-            ReceiveHit(ball.Damage, ball.ImpactStrength, point.x, "direct");
+            ReceiveHit(ball.Damage, ball.ImpactStrength, point.x, "direct", ball.ImpactUpwardMultiplier);
             // Ball On Impact: direct contact explodes (AOE on other monsters/obstacles) and removes the ball.
             KebammImpactExplosion.Explode(ball, point, this);
         }
 
         /// <summary>Damage + push from a direct hit or an impact explosion. Same score rules for both (no score during the recovery hop).</summary>
-        public void ReceiveHit(float ballDamage, float strength, float hitX, string source)
+        public void ReceiveHit(float ballDamage, float strength, float hitX, string source, float upwardMultiplier = 1f)
         {
             if (_defeated)
                 return;
@@ -368,7 +369,7 @@ namespace Kebamm
             _recovering = false; // a hit interrupts the recovery hop; the delay restarts from this hit
             _returning = false;  // a new hit restarts the return-to-spawn-X logic
             _returnPending = _hasOriginalX;
-            ApplyImpact(strength, hitX);
+            ApplyImpact(strength, hitX, upwardMultiplier);
 
             if (_health <= 0f && !_defeated)
             {

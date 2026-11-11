@@ -12,6 +12,16 @@ namespace Kebamm
         public int destroyedPts;
         [Tooltip("Monster size (world units) for this tier (Notion Monster Tier Data 'size'). 0 = fallback 0.25 / 0.35 / 0.45 for tier 1 / 2 / 3.")]
         public float size;
+        [Tooltip("Monster weight = Rigidbody2D mass (Notion Monster Tier Data 'weight'). Heavier monsters are shoved less by falling balls and rocks. Impact / explosion launch speed does not depend on it. <= 0 = default 2 (the old fixed mass).")]
+        public float weight = DefaultWeight;
+
+        public const float DefaultWeight = 2f; // the mass every monster had before weight was exposed
+
+        /// <summary>Rigidbody2D mass for this tier: weight, or 2 when not positive.</summary>
+        public float ResolveWeight()
+        {
+            return weight > 0f ? weight : DefaultWeight;
+        }
 
         public float ResolveSize()
         {

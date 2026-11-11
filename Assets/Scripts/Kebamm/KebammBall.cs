@@ -17,6 +17,8 @@ namespace Kebamm
         public float Damage { get; private set; }
         public float Health { get; private set; }
         public float ImpactStrength { get; private set; }
+        /// <summary>Tier impact_upward_multiplier: scales only the upward part of the push on monsters.</summary>
+        public float ImpactUpwardMultiplier { get; private set; } = 1f;
         /// <summary>Set once the ball has exploded / touched the ground; it is being removed and ignores further contacts.</summary>
         public bool Spent { get; private set; }
         /// <summary>Magic Bomb (combo power-up): never merges, deals no impact damage, explodes via KebammMagicBomb.</summary>
@@ -89,6 +91,7 @@ namespace Kebamm
             Damage = damage;
             Health = hp;
             ImpactStrength = KebammBallTierData.ImpactStrengthForPlayTier(Tier);
+            ImpactUpwardMultiplier = KebammBallTierData.ImpactUpwardMultiplierForPlayTier(Tier);
 
             _rb = GetComponent<Rigidbody2D>();
             _col = GetComponent<CircleCollider2D>();

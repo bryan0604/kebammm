@@ -268,6 +268,22 @@ namespace Kebamm
             Save();
         }
 
+        /// <summary>
+        /// Debug: resets this player's progression to a fresh state (same player id / username / sound + music settings).
+        /// Clears every saved level (best stars, best score, attempts), unlocks back to level 1, last played 1, coins 0.
+        /// </summary>
+        public static void ResetProgress()
+        {
+            var d = Data;
+            int levelsCleared = d.levels.Count;
+            int oldCoins = d.progress.coins;
+            d.levels.Clear();
+            d.progress = new KebammSaveProgress(); // highestLevelUnlocked 1, lastLevelPlayed 1, coins 0
+            SkipNextResult = false;
+            Debug.Log($"{LogTag} Progression reset: {levelsCleared} level result(s) cleared, coins {oldCoins} -> 0, unlocked back to level 1 (player id, username and settings kept).");
+            Save();
+        }
+
         public static void UnlockAll(int maxLevel)
         {
             Data.progress.highestLevelUnlocked = Mathf.Max(Data.progress.highestLevelUnlocked, maxLevel);

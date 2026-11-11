@@ -47,6 +47,41 @@ namespace Kebamm
         /// <summary>comboProgressModifier, or 1 when unset / not positive (same pattern as MonsterHpModifier).</summary>
         public float ComboProgressModifier => comboProgressModifier > 0f ? comboProgressModifier : 1f;
 
+        // Trebuchet (GDD [Level] Monster Group Design). Design letters: Y, X, Z, W, T.
+        public const int DefaultTrebuchetStartDrops = 15;  // Y
+        public const int DefaultTrebuchetStageDrops = 5;   // X
+        public const int DefaultTrebuchetStageGain = 1;    // Z
+        public const int DefaultTrebuchetLaunchDrops = 5;  // W
+        public const int DefaultRockDestroyCount = 2;      // T
+        public const float DefaultRockSize = 0.6f;         // rock diameter (world units); matches siege_data rockScale
+        public const int DefaultTrebuchetMinMonsters = 5;  // min monsters to start construction
+        [Header("Trebuchet")]
+        [Tooltip("Notion Levels column trebuchet_enabled (On / Off). Off = no trebuchet in this level at all (nothing built or shown, no messages, no rocks, no toss lock). Blank = On.")]
+        public bool trebuchetEnabled = true;
+        [Tooltip("Y (Notion Levels column trebuchet_start_drops): player ball drops before monsters start building (also needs trebuchet_min_monsters, default 5). 0 = start immediately. Blank/negative = 15.")]
+        public int trebuchetStartDrops = DefaultTrebuchetStartDrops;
+        [Tooltip("X (trebuchet_stage_drops): every X more drops adds Z build stages (5 stages = complete). 0 or less = 5.")]
+        public int trebuchetStageDrops = DefaultTrebuchetStageDrops;
+        [Tooltip("Z (trebuchet_stage_gain): build stages added every X drops. 0 or less = 1.")]
+        public int trebuchetStageGain = DefaultTrebuchetStageGain;
+        [Tooltip("W (trebuchet_launch_drops): once complete, a rock is launched every W drops (max 3 rocks in play). 0 or less = 5.")]
+        public int trebuchetLaunchDrops = DefaultTrebuchetLaunchDrops;
+        [Tooltip("T (rock_destroy_count): a landed rock destroys the first T balls it touches, then only blocks. 0 = destroys none. Blank/negative = 2.")]
+        public int rockDestroyCount = DefaultRockDestroyCount;
+        [Tooltip("Rock diameter in world units (Notion Levels column rock_size). Blank / 0 / negative = siege_data rock scale (0.6).")]
+        public float rockSize = DefaultRockSize;
+        /// <summary>rock_size for this level, or the siege_data rock scale when not positive.</summary>
+        public float RockSizeOr(float fallback) => rockSize > 0f ? rockSize : fallback;
+        [Tooltip("Minimum monsters required in the level before construction can start after Y drops (Notion Levels column trebuchet_min_monsters). Blank / 0 / negative = 5 (existing MinMonstersToBuild fallback).")]
+        public int trebuchetMinMonsters = DefaultTrebuchetMinMonsters;
+        /// <summary>trebuchet_min_monsters for this level, or the fallback (KebammTrebuchet.MinMonstersToBuild, 5) when not positive.</summary>
+        public int TrebuchetMinMonstersOr(int fallback) => trebuchetMinMonsters > 0 ? trebuchetMinMonsters : fallback;
+        public int TrebuchetStartDrops => trebuchetStartDrops >= 0 ? trebuchetStartDrops : DefaultTrebuchetStartDrops;
+        public int TrebuchetStageDrops => trebuchetStageDrops > 0 ? trebuchetStageDrops : DefaultTrebuchetStageDrops;
+        public int TrebuchetStageGain => trebuchetStageGain > 0 ? trebuchetStageGain : DefaultTrebuchetStageGain;
+        public int TrebuchetLaunchDrops => trebuchetLaunchDrops > 0 ? trebuchetLaunchDrops : DefaultTrebuchetLaunchDrops;
+        public int RockDestroyCount => rockDestroyCount >= 0 ? rockDestroyCount : DefaultRockDestroyCount;
+
         [Header("Obstacles")]
         [Tooltip("Populate building obstacles at level start. Uses Prepopulate Obstacle Qty and Obstacle Position Range X.")] public bool obstaclePopulate;
         [Tooltip("Chance (0-1) each building after the first stacks on a random existing building stack (max 3 per stack).")][Range(0f, 1f)] public float obstacleStackChance;
