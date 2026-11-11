@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: level_05
   m_EditorClassIdentifier:
   levelNumber: 5
-  monsterQty: 7
+  monsterQty: 20
   levelPrepopulate: 1
   prepopulateMonsterNumber: 8
   prepopulateBallColours:
@@ -40,17 +40,17 @@ MonoBehaviour:
   ballTier1Weight: 60
   ballTier2Weight: 30
   ballTier3Weight: 10
-  ballTier4Weight: 0
+  ballTier4Weight: 3
   ballTier5Weight: 0
-  monsterHpModifier: 1
-  typeLevel: ""
+  monsterHpModifier: 1.5
+  typeLevel: Hard
   bombEveryMoves: 0
   comboProgressModifier: 1
   trebuchetStartDrops: 15
   trebuchetStageDrops: 5
   trebuchetStageGain: 1
-  trebuchetLaunchDrops: 5
-  rockDestroyCount: 2
-  rockSize: 0.6
+  trebuchetLaunchDrops: 25
+  rockDestroyCount: 1
+  rockSize: 0.7
   trebuchetEnabled: 1
   trebuchetMinMonsters: 5

@@ -11,15 +11,18 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: cf6cec1b50e64a8abd84834aa7e225f9, type: 3}
   m_Name: level_01
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier:
   levelNumber: 1
-  monsterQty: 6
+  monsterQty: 10
   levelPrepopulate: 1
   prepopulateMonsterNumber: 3
-  prepopulateBallColours: 000000000100000002000000
+  prepopulateBallColours:
+  - 0
+  - 1
+  - 2
   prepopulateMonsterTierMin: 1
   prepopulateMonsterTierMax: 2
-  prepopulateObstacleQty: 8
+  prepopulateObstacleQty: 2
   prepopulateMonsterPositionRangeX: {x: -2, y: 2}
   prepopulateMonsterPositionRangeY: {x: 0, y: 1}
   prepopulateObstaclePositionRangeX: {x: -2, y: 2}
@@ -39,14 +42,14 @@ MonoBehaviour:
   ballTier4Weight: 0
   ballTier5Weight: 0
   monsterHpModifier: 1
-  typeLevel: ""
+  typeLevel: Beginner
   bombEveryMoves: 0
   comboProgressModifier: 1
   trebuchetStartDrops: 15
   trebuchetStageDrops: 5
   trebuchetStageGain: 1
   trebuchetLaunchDrops: 5
-  rockDestroyCount: 2
-  rockSize: 0.6
-  trebuchetEnabled: 1
+  rockDestroyCount: 1
+  rockSize: 0.7
+  trebuchetEnabled: 0
   trebuchetMinMonsters: 5

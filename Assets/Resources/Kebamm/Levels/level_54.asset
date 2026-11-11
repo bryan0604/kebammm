@@ -1,0 +1,55 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf6cec1b50e64a8abd84834aa7e225f9, type: 3}
+  m_Name: level_54
+  m_EditorClassIdentifier:
+  levelNumber: 54
+  monsterQty: 13
+  levelPrepopulate: 1
+  prepopulateMonsterNumber: 4
+  prepopulateBallColours:
+  - 0
+  - 1
+  - 2
+  prepopulateMonsterTierMin: 1
+  prepopulateMonsterTierMax: 3
+  prepopulateObstacleQty: 7
+  prepopulateMonsterPositionRangeX: {x: -2, y: 2}
+  prepopulateMonsterPositionRangeY: {x: 0, y: 1.2}
+  prepopulateObstaclePositionRangeX: {x: -2, y: 2}
+  prepopulateObstaclePositionRangeY: {x: 0, y: 1.2}
+  monsterStackChance: 0.8
+  obstaclePopulate: 1
+  obstacleStackChance: 0.3
+  allowedObstacleShapes:
+  - 0
+  - 1
+  - 2
+  ballTierMin: 1
+  ballTierMax: 3
+  ballTier1Weight: 60
+  ballTier2Weight: 30
+  ballTier3Weight: 10
+  ballTier4Weight: 0
+  ballTier5Weight: 0
+  monsterHpModifier: 1.65
+  typeLevel: Normal
+  bombEveryMoves: 0
+  comboProgressModifier: 1
+  trebuchetStartDrops: 15
+  trebuchetStageDrops: 5
+  trebuchetStageGain: 1
+  trebuchetLaunchDrops: 22
+  rockDestroyCount: 1
+  rockSize: 0.7
+  trebuchetEnabled: 1
+  trebuchetMinMonsters: 5

@@ -13,20 +13,20 @@ MonoBehaviour:
   m_Name: level_03
   m_EditorClassIdentifier:
   levelNumber: 3
-  monsterQty: 6
+  monsterQty: 11
   levelPrepopulate: 1
-  prepopulateMonsterNumber: 5
+  prepopulateMonsterNumber: 4
   prepopulateBallColours:
   - 0
   - 1
   - 2
   prepopulateMonsterTierMin: 1
   prepopulateMonsterTierMax: 3
-  prepopulateObstacleQty: 8
-  prepopulateMonsterPositionRangeX: {x: -2.5, y: 2.5}
-  prepopulateMonsterPositionRangeY: {x: 0, y: 1.5}
-  prepopulateObstaclePositionRangeX: {x: -2.5, y: 2.5}
-  prepopulateObstaclePositionRangeY: {x: 0, y: 1.5}
+  prepopulateObstacleQty: 5
+  prepopulateMonsterPositionRangeX: {x: -2, y: 2}
+  prepopulateMonsterPositionRangeY: {x: 0, y: 1.2}
+  prepopulateObstaclePositionRangeX: {x: -2, y: 2}
+  prepopulateObstaclePositionRangeY: {x: 0, y: 1.2}
   monsterStackChance: 0.8
   obstaclePopulate: 1
   obstacleStackChance: 0.3
@@ -41,15 +41,15 @@ MonoBehaviour:
   ballTier3Weight: 10
   ballTier4Weight: 0
   ballTier5Weight: 0
-  monsterHpModifier: 1
-  typeLevel: ""
+  monsterHpModifier: 1.55
+  typeLevel: Normal
   bombEveryMoves: 0
   comboProgressModifier: 1
   trebuchetStartDrops: 15
   trebuchetStageDrops: 5
   trebuchetStageGain: 1
-  trebuchetLaunchDrops: 5
-  rockDestroyCount: 2
-  rockSize: 0.6
+  trebuchetLaunchDrops: 24
+  rockDestroyCount: 1
+  rockSize: 0.7
   trebuchetEnabled: 1
   trebuchetMinMonsters: 5
