@@ -8,6 +8,9 @@ namespace Kebamm
     /// and passes it on to balls resting on it; a merged ball is in play only if one of its two source balls was. The held/aimed ball and a fresh drop before its first contact never count.
     /// The moment any in-play ball touches the cap band (collider top at or above the drawn red line's bottom edge), the
     /// container floor opens (bombing run) immediately. Fires once; only during normal play.
+    /// Near-cap blink (GDD Visual Near Max Caps Line): if any in-play jar ball's top edge is within closeDistance
+    /// below the line, the drawn cap line lerps white/red until none are close, the bombing run starts, or the level resets.
+    /// Held/preview balls, magic bombs, spent/removed balls and rocks are not counted.
     /// </summary>
     [RequireComponent(typeof(BoxCollider2D))]
     public class KebammCapacityMonitor : MonoBehaviour
@@ -39,6 +42,43 @@ namespace Kebamm
 
         // Trip at the drawn red line's bottom edge (not the thicker trigger band's bottom).
         float BandBottom => _container != null ? _container.CapLineBottomY : transform.position.y;
+
+        void Update()
+        {
+            if (_container == null)
+                return;
+            var boot = KebammPrototypeBootstrap.Instance;
+            if (_container.IsOpen || (boot != null && (boot.IsBombingRun || boot.InMainMenu)))
+            {
+                _container.RestoreCapLineColor();
+                return;
+            }
+
+            var gm = boot != null ? boot.GameManagerData : null;
+            float close = gm != null ? gm.MaxCapLineCloseDistance : 1f;
+            float half = gm != null ? gm.MaxCapLineBlinkHalfPeriod : 0.25f;
+            _container.TickCapLineBlink(AnyBallCloseToCapLine(close), half);
+        }
+
+        /// <summary>
+        /// True if any in-play (non-preview, non-spent) ball's top edge (position + radius) is within closeDistance
+        /// world units below the drawn cap line's bottom edge. Rocks and magic bombs are not in KebammBall.Live.
+        /// </summary>
+        bool AnyBallCloseToCapLine(float closeDistance)
+        {
+            float lineY = BandBottom;
+            var live = KebammBall.Live;
+            for (int i = 0; i < live.Count; i++)
+            {
+                KebammBall ball = live[i];
+                if (ball == null || ball.IsPreview || ball.IsMerging || ball.Spent || !ball.InPlay || !ball.gameObject.activeInHierarchy)
+                    continue;
+                float below = lineY - (ball.transform.position.y + ball.Radius);
+                if (below >= 0f && below <= closeDistance)
+                    return true;
+            }
+            return false;
+        }
 
         void FixedUpdate()
         {
@@ -74,6 +114,7 @@ namespace Kebamm
 
         public void ResetTimers()
         {
+            _container?.RestoreCapLineColor();
         }
     }
 }

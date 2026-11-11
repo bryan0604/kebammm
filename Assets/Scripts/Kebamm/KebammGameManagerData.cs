@@ -97,6 +97,11 @@ namespace Kebamm
         [Range(0f, 100f)] public float dropIndicationOpacity = 30f;
         [Tooltip("Dotted aim guide thickness in world units. Local only; 0 hides it. Applied live.")]
         [Min(0f)] public float dropIndicationThickness = 0.025f;
+        [Header("Max Cap Line Blink (Notion Game Manager)")]
+        [Tooltip("World units below the max cap line. If any in-play ball's top edge (position + radius) is this close or closer, the line blinks white and red (Notion max_cap_line_close_distance). <= 0 = 1.")]
+        [Min(0f)] public float maxCapLineCloseDistance = 1f;
+        [Tooltip("Seconds for one white-to-red or red-to-white colour flip. 0.25 = 4 flips per second (Notion max_cap_line_blink_half_period). <= 0 = 0.25.")]
+        [Min(0.05f)] public float maxCapLineBlinkHalfPeriod = 0.25f;
         [Header("Coin Reward (local only, not in Notion)")]
         [Tooltip("Coins per monster killed this attempt. Local only; not exported to Notion or the Gist.")]
         public int coinPerKill = 8;
@@ -139,6 +144,8 @@ namespace Kebamm
         public int MagicBombExplodeStrength => Mathf.Max(0, magicBombExplodeStrength);
         /// <summary>magicBombSize, or 0 when unset (caller falls back to combo_config bombDiameter).</summary>
         public float MagicBombSize => magicBombSize > 0f ? magicBombSize : 0f;
+        public float MaxCapLineCloseDistance => maxCapLineCloseDistance > 0f ? maxCapLineCloseDistance : 1f;
+        public float MaxCapLineBlinkHalfPeriod => maxCapLineBlinkHalfPeriod > 0f ? maxCapLineBlinkHalfPeriod : 0.25f;
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));
         public float Star3Threshold => Mathf.Max(Star2Threshold, Mathf.Clamp01(star3Threshold));

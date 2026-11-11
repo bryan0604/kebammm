@@ -23,7 +23,14 @@ namespace Kebamm
         public float FloorY { get; private set; }
 
         Transform _wallL, _wallR, _floor, _line;
+        SpriteRenderer _lineSr;
         SpriteRenderer _panelSr;
+        /// <summary>Rest colour of the drawn cap line (not blinking).</summary>
+        public static readonly Color CapLineRestColor = new Color(1f, 0.35f, 0.2f, 0.65f);
+        static readonly Color CapLineBlinkWhite = Color.white;
+        static readonly Color CapLineBlinkRed = Color.red;
+        bool _lineBlinking;
+        float _lineBlinkT;
         /// <summary>Jar panel sorting: above the level background (-100), below everything else (ground -1, balls 10+, base 2, pillars 3).</summary>
         public const int JarPanelSortingOrder = -50;
         SpriteRenderer _artL, _artR;
@@ -66,10 +73,10 @@ namespace Kebamm
             var lineGo = new GameObject("CapacityLineVisual");
             lineGo.transform.SetParent(transform, false);
             _line = lineGo.transform;
-            var lineSr = lineGo.AddComponent<SpriteRenderer>();
-            lineSr.sprite = KebammVisualFactory.SquareSprite;
-            lineSr.color = new Color(1f, 0.35f, 0.2f, 0.65f);
-            lineSr.sortingOrder = 5;
+            _lineSr = lineGo.AddComponent<SpriteRenderer>();
+            _lineSr.sprite = KebammVisualFactory.SquareSprite;
+            _lineSr.color = CapLineRestColor;
+            _lineSr.sortingOrder = 5;
 
             // Jar panel: see-through white fill of the jar play area (visual only, no collider).
             var panelGo = new GameObject("JarPanel");
@@ -128,6 +135,39 @@ namespace Kebamm
 
             _line.position = new Vector3(x, CapacityY, 0f);
             _line.localScale = new Vector3(width, CapLineThickness, 1f);
+        }
+
+        /// <summary>
+        /// When shouldBlink is true, lerps the cap line between white and red (one flip per halfPeriod seconds).
+        /// When false, stops and restores the rest colour. Safe to call every Update.
+        /// </summary>
+        public void TickCapLineBlink(bool shouldBlink, float halfPeriod)
+        {
+            if (_lineSr == null)
+                return;
+            if (!shouldBlink)
+            {
+                RestoreCapLineColor();
+                return;
+            }
+            if (!_lineBlinking)
+            {
+                _lineBlinking = true;
+                _lineBlinkT = 0f;
+            }
+            _lineBlinkT += Time.deltaTime / Mathf.Max(0.05f, halfPeriod);
+            _lineSr.color = Color.Lerp(CapLineBlinkWhite, CapLineBlinkRed, Mathf.PingPong(_lineBlinkT, 1f));
+        }
+
+        /// <summary>Stops blinking and restores the cap line's rest colour.</summary>
+        public void RestoreCapLineColor()
+        {
+            if (!_lineBlinking && (_lineSr == null || _lineSr.color == CapLineRestColor))
+                return;
+            _lineBlinking = false;
+            _lineBlinkT = 0f;
+            if (_lineSr != null)
+                _lineSr.color = CapLineRestColor;
         }
 
         /// <summary>Inner top of the pillars (world y).</summary>
@@ -201,6 +241,7 @@ namespace Kebamm
             IsOpen = true;
             if (FloorCollider != null)
                 FloorCollider.enabled = false;
+            RestoreCapLineColor();
             if (_floorSr != null)
                 _floorSr.color = new Color(_floorColor.r, _floorColor.g, _floorColor.b, 0.25f);
             Debug.Log("[Kebamm] Container floor OPEN — balls releasing");
@@ -213,6 +254,7 @@ namespace Kebamm
                 FloorCollider.enabled = true;
             if (_floorSr != null)
                 _floorSr.color = _floorColor;
+            RestoreCapLineColor();
             Debug.Log("[Kebamm] Container floor CLOSED");
         }
     }
