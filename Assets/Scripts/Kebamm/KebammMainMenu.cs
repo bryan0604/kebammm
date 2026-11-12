@@ -16,7 +16,7 @@ namespace Kebamm
     /// edges cropped, bottom-aligned so the pedestal stays above the buttons).
     /// Monsters and bubbles live on a "Stage" that uses background pixel
     /// coordinates, so they stay on the pedestal on every screen shape.
-    /// Title, level text and buttons sit on the canvas itself.
+    /// Title and buttons sit on the canvas itself. The start button shows the current level.
     /// </summary>
     public class KebammMainMenu : MonoBehaviour
     {
@@ -27,6 +27,21 @@ namespace Kebamm
         const float StageWidth = 900f;
         const float StageHeight = 2000f;
         const int BubbleCount = 7;
+        const float StartButtonWidth = 700f;
+        // Setting Button V3 art (1308x296, label baked in) is drawn at the Start art's scale.
+        const float SettingsButtonWidth = 704f;
+        const float StartButtonPadX = 100f;
+        const float StartIconSize = 72f;
+        const float StartIconTextSpacing = 18f;
+        // Empty_Button art: green pill body is rows 0-247 of 288, drop shadow below.
+        // Shift content up so it centres on the pill body, not the whole image.
+        const float StartArtBodyCentreOffset = 20f / 288f;
+        // Nudge the icon + level text group sideways (negative = left).
+        const float StartContentOffsetX = -15f;
+        const float StartLevelFontMin = 28f;
+        const float StartLevelFontMax = 84f;
+        const string LilitaFontPath = "Kebamm/Fonts/LilitaOne-Regular";
+        const string StartIconPath = "icon_play";
 
         GameObject _root;
         GameObject _settingsRoot;
@@ -36,6 +51,10 @@ namespace Kebamm
         Rect _lastSafeArea;
         Vector2Int _lastScreen;
         TextMeshProUGUI _levelLabel;
+        LayoutElement _levelLabelLayout;
+        RectTransform _startButtonRect;
+        RectTransform _startContent;
+        [SerializeField] Sprite startButtonIcon;
 
         // Things that animate, with their rest positions so Show() can restart cleanly.
         RectTransform[] _letters;
@@ -60,6 +79,8 @@ namespace Kebamm
         TextMeshProUGUI _updateText;
         static TMP_FontAsset _font;
         static bool _fontTried;
+        static TMP_FontAsset _lilitaFont;
+        static bool _lilitaTried;
 
         static readonly Color BackgroundTop = new Color(0.78f, 0.24f, 0.71f);
         static readonly Color Pedestal = new Color(0.56f, 0.27f, 0.86f);
@@ -144,29 +165,19 @@ namespace Kebamm
             BuildTitle();
 
             // Bottom stack inside the safe area, measured up from the safe bottom edge:
-            // Settings centre 130 (about 60 clear below it), 50 gap, Start centre 365, Level text above Start.
+            // Start centre 365 (level text on the button). Settings centre 214, so about 20 px
+            // between the visible Start pill (above its drop shadow) and the Settings art.
             var safeGo = new GameObject("SafeArea");
             safeGo.transform.SetParent(_root.transform, false);
             _safe = safeGo.AddComponent<RectTransform>();
             Stretch(_safe);
             ApplySafeArea();
 
-            var startRect = CreateButton(_safe, "StartButton", "START", 72f, Color.white, StartGreen,
-                LoadArt("btn_start"), new Vector2(0f, 365f), 560f, new Vector2(700f, 160f), OnStart);
+            var startRect = BuildStartButton(_safe, new Vector2(0f, 365f), OnStart);
             var settingsRect = CreateButton(_safe, "SettingsButton", "Settings", 46f, SettingsText, SettingsFill,
-                LoadArt("btn_settings"), new Vector2(0f, 130f), 400f, new Vector2(520f, 110f), OnSettings);
+                LoadArt("Setting_Button_V3"), new Vector2(0f, 214f), SettingsButtonWidth, new Vector2(520f, 110f), OnSettings);
             AnchorBottom(startRect);
             AnchorBottom(settingsRect);
-
-            _levelLabel = CreateLabel(_safe, "LevelText", "Level 1", 60f,
-                Vector2.zero, new Vector2(800f, 80f), Color.white);
-            _levelLabel.fontStyle = FontStyles.Bold;
-            _levelLabel.outlineWidth = 0.25f;
-            _levelLabel.outlineColor = new Color32(70, 25, 120, 255);
-            AnchorBottom(_levelLabel.rectTransform);
-            // Right above Start: Start top edge + 15 gap + half the label height.
-            _levelLabel.rectTransform.anchoredPosition =
-                new Vector2(0f, startRect.anchoredPosition.y + startRect.sizeDelta.y * 0.5f + 15f + 40f);
 
             // Data version / time / source (online, cached, built-in), bottom-right corner.
             _dataLabel = CreateLabel(_safe, "DataVersionText", KebammRemoteData.StatusText, 26f,
@@ -423,7 +434,8 @@ namespace Kebamm
                 return;
             var bootstrap = KebammPrototypeBootstrap.Instance;
             int level = bootstrap != null ? bootstrap.CurrentLevelNumber : 1;
-            _levelLabel.text = $"Level {level}";
+            _levelLabel.text = $"LEVEL {level}";
+            FitStartButtonContent();
         }
 
         // PLACEHOLDER Player Information Panel (Notion: Main Menu > Player Information Panel), top-left, not clickable.
@@ -693,6 +705,165 @@ namespace Kebamm
             Vector2 pos = rect.anchoredPosition;
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0f);
             rect.anchoredPosition = pos;
+        }
+
+
+        /// <summary>
+        /// Start button: Empty Start Button V2 art, with a play icon and
+        /// "LEVEL {current}" in Lilita One, centred as one group. The icon
+        /// sprite can be swapped via the startButtonIcon field or by replacing
+        /// Resources/Kebamm/UI/MainMenu/icon_play.png.
+        /// </summary>
+        RectTransform BuildStartButton(Transform parent, Vector2 anchored, UnityEngine.Events.UnityAction onClick)
+        {
+            Sprite art = LoadArt("Empty_Button");
+            bool hasArt = art != null;
+            Vector2 size = hasArt
+                ? new Vector2(StartButtonWidth, StartButtonWidth * Aspect(art, 0.22f))
+                : new Vector2(700f, 160f);
+
+            var image = CreateImage(parent, "StartButton", hasArt ? art : KebammVisualFactory.SquareSprite, hasArt ? Color.white : StartGreen);
+            Place(image.rectTransform, anchored, size);
+            image.preserveAspect = hasArt;
+            image.raycastTarget = true;
+            var button = image.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+            var colours = button.colors;
+            colours.pressedColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+            button.colors = colours;
+            button.onClick.AddListener(onClick);
+            _startButtonRect = image.rectTransform;
+
+            var contentGo = new GameObject("StartButtonContent");
+            contentGo.transform.SetParent(image.transform, false);
+            _startContent = contentGo.AddComponent<RectTransform>();
+            _startContent.anchorMin = _startContent.anchorMax = _startContent.pivot = new Vector2(0.5f, 0.5f);
+            _startContent.anchoredPosition = new Vector2(StartContentOffsetX, hasArt ? size.y * StartArtBodyCentreOffset : 0f);
+            _startContent.sizeDelta = Vector2.zero;
+
+            var layout = contentGo.AddComponent<HorizontalLayoutGroup>();
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.spacing = StartIconTextSpacing;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.padding = new RectOffset(0, 0, 0, 0);
+
+            var fitter = contentGo.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            Sprite iconSprite = GetStartButtonIcon();
+            var icon = CreateImage(contentGo.transform, "Icon", iconSprite != null ? iconSprite : KebammVisualFactory.SquareSprite, Color.white);
+            icon.preserveAspect = true;
+            icon.raycastTarget = false;
+            var iconLayout = icon.gameObject.AddComponent<LayoutElement>();
+            iconLayout.preferredWidth = StartIconSize;
+            iconLayout.preferredHeight = StartIconSize;
+            iconLayout.minWidth = StartIconSize * 0.6f;
+            iconLayout.minHeight = StartIconSize * 0.6f;
+            iconLayout.flexibleWidth = 0f;
+            iconLayout.flexibleHeight = 0f;
+
+            _levelLabel = CreateLabel(contentGo.transform, "LevelText", "LEVEL 1", StartLevelFontMax,
+                Vector2.zero, new Vector2(400f, StartIconSize), Color.white);
+            _levelLabel.fontStyle = FontStyles.Normal;
+            _levelLabel.alignment = TextAlignmentOptions.Center;
+            TMP_FontAsset lilita = GetLilitaFont();
+            if (lilita != null)
+                _levelLabel.font = lilita;
+            _levelLabel.enableAutoSizing = true;
+            _levelLabel.fontSizeMin = StartLevelFontMin;
+            _levelLabel.fontSizeMax = StartLevelFontMax;
+            _levelLabelLayout = _levelLabel.gameObject.AddComponent<LayoutElement>();
+            _levelLabelLayout.preferredHeight = Mathf.Max(StartIconSize, StartLevelFontMax);
+            _levelLabelLayout.minHeight = StartLevelFontMin;
+            _levelLabelLayout.flexibleWidth = 0f;
+
+            return image.rectTransform;
+        }
+
+        /// <summary>
+        /// Pack the icon + level text as a centred group. Short labels stay at
+        /// the max font size; longer ones (e.g. LEVEL 100) shrink to fit inside
+        /// the button, including its rounded ends.
+        /// </summary>
+        void FitStartButtonContent()
+        {
+            if (_levelLabel == null || _startContent == null || _startButtonRect == null || _levelLabelLayout == null)
+                return;
+
+            _levelLabel.enableAutoSizing = false;
+            _levelLabel.fontSize = StartLevelFontMax;
+            _levelLabel.ForceMeshUpdate();
+
+            float textWidth = Mathf.Ceil(_levelLabel.preferredWidth) + 2f;
+            float maxGroup = Mathf.Max(80f, _startButtonRect.rect.width - StartButtonPadX * 2f);
+            float maxText = Mathf.Max(40f, maxGroup - StartIconSize - StartIconTextSpacing);
+
+            if (textWidth > maxText)
+            {
+                _levelLabelLayout.preferredWidth = maxText;
+                _levelLabel.enableAutoSizing = true;
+                _levelLabel.fontSizeMin = StartLevelFontMin;
+                _levelLabel.fontSizeMax = StartLevelFontMax;
+            }
+            else
+            {
+                _levelLabelLayout.preferredWidth = textWidth;
+                _levelLabel.enableAutoSizing = false;
+                _levelLabel.fontSize = StartLevelFontMax;
+            }
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_startContent);
+            CentreLevelTextVertically();
+        }
+
+        /// <summary>
+        /// All-caps text sits off-centre with the font's line metrics, so nudge
+        /// the visible glyphs onto the vertical centre of the button.
+        /// </summary>
+        void CentreLevelTextVertically()
+        {
+            _levelLabel.margin = Vector4.zero;
+            _levelLabel.ForceMeshUpdate();
+            if (_levelLabel.textInfo == null || _levelLabel.textInfo.characterCount == 0)
+                return;
+            RectTransform rt = _levelLabel.rectTransform;
+            float rectCentreY = (0.5f - rt.pivot.y) * rt.rect.height;
+            float offset = _levelLabel.textBounds.center.y - rectCentreY;
+            _levelLabel.margin = new Vector4(0f, offset, 0f, -offset);
+            _levelLabel.ForceMeshUpdate();
+        }
+
+        Sprite GetStartButtonIcon()
+        {
+            if (startButtonIcon != null)
+                return startButtonIcon;
+            Sprite loaded = Resources.Load<Sprite>(ArtPath + StartIconPath);
+            if (loaded == null)
+                Debug.LogWarning($"[Kebamm] Start button icon missing: Resources/{ArtPath}{StartIconPath}.png - using placeholder.");
+            return loaded;
+        }
+
+        static TMP_FontAsset GetLilitaFont()
+        {
+            if (_lilitaFont != null)
+                return _lilitaFont;
+            if (_lilitaTried)
+                return GetFont();
+            _lilitaTried = true;
+            KebammFrameSpikeLog.FontLoads++;
+            Font ttf = Resources.Load<Font>(LilitaFontPath);
+            if (ttf == null)
+            {
+                Debug.LogWarning($"[Kebamm] Lilita One missing: Resources/{LilitaFontPath}.ttf - falling back to the default menu font.");
+                return GetFont();
+            }
+
+            _lilitaFont = TMP_FontAsset.CreateFontAsset(ttf);
+            return _lilitaFont != null ? _lilitaFont : GetFont();
         }
 
         RectTransform CreateButton(Transform parent, string buttonName, string text, float fontSize, Color textColour, Color fill,

@@ -52,7 +52,7 @@ namespace Kebamm
             if (_cooldownLeft > 0f)
                 _cooldownLeft -= Time.deltaTime;
 
-            bool allowDrop = _canDrop && !_container.IsOpen;
+            bool allowDrop = _canDrop && !_container.IsOpen && !_container.CapBreachPending; // no drops once the Max Cap Line is hit
             if (_preview != null && _preview.gameObject.activeSelf != allowDrop)
                 _preview.gameObject.SetActive(allowDrop);
             UpdateBombIndicator();

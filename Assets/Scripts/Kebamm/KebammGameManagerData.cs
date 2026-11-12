@@ -102,6 +102,10 @@ namespace Kebamm
         [Min(0f)] public float maxCapLineCloseDistance = 1f;
         [Tooltip("Seconds for one white-to-red or red-to-white colour flip. 0.25 = 4 flips per second (Notion max_cap_line_blink_half_period). <= 0 = 0.25.")]
         [Min(0.05f)] public float maxCapLineBlinkHalfPeriod = 0.25f;
+        [Tooltip("When an in-play ball hits the Max Cap Line, the line blinks this many times faster (1.5 = 50% faster) until the bombing run starts (Notion max_cap_hit_blink_speed_multiplier). <= 0 = 1.5.")]
+        [Min(0.1f)] public float maxCapHitBlinkSpeedMultiplier = 1.5f;
+        [Tooltip("Seconds between a ball hitting the Max Cap Line and the bombing run starting; drops are blocked meanwhile (Notion max_cap_hit_delay_seconds). <= 0 = 1.5.")]
+        [Min(0.1f)] public float maxCapHitDelaySeconds = 1.5f;
         [Header("Coin Reward (local only, not in Notion)")]
         [Tooltip("Coins per monster killed this attempt. Local only; not exported to Notion or the Gist.")]
         public int coinPerKill = 8;
@@ -146,6 +150,8 @@ namespace Kebamm
         public float MagicBombSize => magicBombSize > 0f ? magicBombSize : 0f;
         public float MaxCapLineCloseDistance => maxCapLineCloseDistance > 0f ? maxCapLineCloseDistance : 1f;
         public float MaxCapLineBlinkHalfPeriod => maxCapLineBlinkHalfPeriod > 0f ? maxCapLineBlinkHalfPeriod : 0.25f;
+        public float MaxCapHitBlinkSpeedMultiplier => maxCapHitBlinkSpeedMultiplier > 0f ? maxCapHitBlinkSpeedMultiplier : 1.5f;
+        public float MaxCapHitDelaySeconds => maxCapHitDelaySeconds > 0f ? maxCapHitDelaySeconds : 1.5f;
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));
         public float Star3Threshold => Mathf.Max(Star2Threshold, Mathf.Clamp01(star3Threshold));

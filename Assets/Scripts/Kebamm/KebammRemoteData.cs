@@ -367,6 +367,8 @@ namespace Kebamm
             SetFloat(row, "magic_bomb_size", "GameManager", "magicBombSize", ref g.magicBombSize);
             SetFloat(row, "max_cap_line_close_distance", "GameManager", "maxCapLineCloseDistance", ref g.maxCapLineCloseDistance);
             SetFloat(row, "max_cap_line_blink_half_period", "GameManager", "maxCapLineBlinkHalfPeriod", ref g.maxCapLineBlinkHalfPeriod);
+            SetFloat(row, "max_cap_hit_blink_speed_multiplier", "GameManager", "maxCapHitBlinkSpeedMultiplier", ref g.maxCapHitBlinkSpeedMultiplier);
+            SetFloat(row, "max_cap_hit_delay_seconds", "GameManager", "maxCapHitDelaySeconds", ref g.maxCapHitDelaySeconds);
             if (row.ContainsKey("debug_console_hold_seconds"))
                 Debug.Log("[KebammRemoteData] debug_console_hold_seconds=" + g.debugConsoleHoldSeconds.ToString(CultureInfo.InvariantCulture));
             return g;

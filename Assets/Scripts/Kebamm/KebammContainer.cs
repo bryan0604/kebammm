@@ -10,6 +10,8 @@ namespace Kebamm
         public Collider2D FloorCollider { get; private set; }
         public Transform FloorVisual { get; private set; }
         public bool IsOpen { get; private set; }
+        /// <summary>True between a ball hitting the Max Cap Line and the floor opening (bombing run start): drops are blocked, the cap line blinks faster.</summary>
+        public bool CapBreachPending { get; set; }
 
         SpriteRenderer _floorSr;
         Color _floorColor = new Color(0.55f, 0.45f, 0.35f);
@@ -239,6 +241,7 @@ namespace Kebamm
             if (IsOpen)
                 return;
             IsOpen = true;
+            CapBreachPending = false;
             if (FloorCollider != null)
                 FloorCollider.enabled = false;
             RestoreCapLineColor();
@@ -250,6 +253,7 @@ namespace Kebamm
         public void CloseFloor()
         {
             IsOpen = false;
+            CapBreachPending = false;
             if (FloorCollider != null)
                 FloorCollider.enabled = true;
             if (_floorSr != null)

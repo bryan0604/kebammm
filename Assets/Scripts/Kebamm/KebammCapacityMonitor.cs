@@ -11,12 +11,17 @@ namespace Kebamm
     /// Near-cap blink (GDD Visual Near Max Caps Line): if any in-play jar ball's top edge is within closeDistance
     /// below the line, the drawn cap line lerps white/red until none are close, the bombing run starts, or the level resets.
     /// Held/preview balls, magic bombs, spent/removed balls and rocks are not counted.
+    /// Hit delay (GDD Gameplay Slower Bombing Run): the moment a ball hits the line the bombing run is NOT started at once. For
+    /// max_cap_hit_delay_seconds the line blinks max_cap_hit_blink_speed_multiplier times faster and drops are blocked
+    /// (KebammContainer.CapBreachPending); then the floor opens and the blinking stops. Triggers once, freezes with Time.timeScale 0.
     /// </summary>
     [RequireComponent(typeof(BoxCollider2D))]
     public class KebammCapacityMonitor : MonoBehaviour
     {
         KebammContainer _container;
         BoxCollider2D _box;
+        bool _breachPending;
+        float _breachLeft;
 
         /// <summary>Kept for callers; there is no hold timer any more.</summary>
         public float Timer => 0f;
@@ -50,6 +55,7 @@ namespace Kebamm
             var boot = KebammPrototypeBootstrap.Instance;
             if (_container.IsOpen || (boot != null && (boot.IsBombingRun || boot.InMainMenu)))
             {
+                ClearBreach();
                 _container.RestoreCapLineColor();
                 return;
             }
@@ -57,6 +63,22 @@ namespace Kebamm
             var gm = boot != null ? boot.GameManagerData : null;
             float close = gm != null ? gm.MaxCapLineCloseDistance : 1f;
             float half = gm != null ? gm.MaxCapLineBlinkHalfPeriod : 0.25f;
+
+            if (_breachPending)
+            {
+                // Faster blink for the hit delay, then the bombing run starts and the blinking stops (OpenFloor restores the rest colour).
+                float mult = gm != null ? gm.MaxCapHitBlinkSpeedMultiplier : 1.5f;
+                _container.TickCapLineBlink(true, half / mult);
+                _breachLeft -= Time.deltaTime; // scaled time: pause (timeScale 0) freezes the delay
+                if (_breachLeft <= 0f)
+                {
+                    _breachPending = false;
+                    Debug.Log("[Kebamm] Max Cap Line hit delay over - bombing run starts");
+                    _container.OpenFloor();
+                }
+                return;
+            }
+
             _container.TickCapLineBlink(AnyBallCloseToCapLine(close), half);
         }
 
@@ -87,6 +109,8 @@ namespace Kebamm
             var boot = KebammPrototypeBootstrap.Instance;
             if (boot != null && boot.IsBombingRun)
                 return;
+            if (_breachPending)
+                return; // already hit: waiting out the hit delay, fires once
 
             float bandBottom = BandBottom;
             var live = KebammBall.Live;
@@ -100,9 +124,20 @@ namespace Kebamm
                     continue;
 
                 Debug.Log($"[Kebamm] Capacity breached ({ball.name} in play touched the line)");
-                _container.OpenFloor();
+                var gm = boot != null ? boot.GameManagerData : null;
+                _breachLeft = gm != null ? gm.MaxCapHitDelaySeconds : 1.5f;
+                _breachPending = true;
+                _container.CapBreachPending = true;
                 return;
             }
+        }
+
+        void ClearBreach()
+        {
+            _breachPending = false;
+            _breachLeft = 0f;
+            if (_container != null)
+                _container.CapBreachPending = false;
         }
 
         /// <summary>Called by the bootstrap when a merge spawns a ball: in play only if one of its source balls was.</summary>
@@ -114,6 +149,7 @@ namespace Kebamm
 
         public void ResetTimers()
         {
+            ClearBreach();
             _container?.RestoreCapLineColor();
         }
     }
