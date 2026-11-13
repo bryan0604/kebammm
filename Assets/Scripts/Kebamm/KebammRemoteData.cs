@@ -369,18 +369,40 @@ namespace Kebamm
             SetFloat(row, "max_cap_line_blink_half_period", "GameManager", "maxCapLineBlinkHalfPeriod", ref g.maxCapLineBlinkHalfPeriod);
             SetFloat(row, "max_cap_hit_blink_speed_multiplier", "GameManager", "maxCapHitBlinkSpeedMultiplier", ref g.maxCapHitBlinkSpeedMultiplier);
             SetFloat(row, "max_cap_hit_delay_seconds", "GameManager", "maxCapHitDelaySeconds", ref g.maxCapHitDelaySeconds);
-            SetFloat(row, "explosion_bit_size", "GameManager", "explosionBitSize", ref g.explosionBitSize);
-            SetInt(row, "explosion_bit_max_per_side", "GameManager", "explosionBitMaxPerSide", ref g.explosionBitMaxPerSide);
-            SetFloat(row, "explosion_bit_up_force_min", "GameManager", "explosionBitUpForceMin", ref g.explosionBitUpForceMin);
-            SetFloat(row, "explosion_bit_up_force_max", "GameManager", "explosionBitUpForceMax", ref g.explosionBitUpForceMax);
-            SetFloat(row, "explosion_bit_side_spread", "GameManager", "explosionBitSideSpread", ref g.explosionBitSideSpread);
-            SetFloat(row, "explosion_bit_gravity_min", "GameManager", "explosionBitGravityMin", ref g.explosionBitGravityMin);
-            SetFloat(row, "explosion_bit_gravity_max", "GameManager", "explosionBitGravityMax", ref g.explosionBitGravityMax);
-            SetFloat(row, "explosion_bit_lifetime", "GameManager", "explosionBitLifetime", ref g.explosionBitLifetime);
-            SetInt(row, "explosion_bit_max_on_screen", "GameManager", "explosionBitMaxOnScreen", ref g.explosionBitMaxOnScreen);
+            // VFX values: the VFX table (Notion VFX, Gist section "vfx") wins; older Gists still carry them on Game Manager.
+            ApplyVfx(row, "GameManager", g);
+            var vfx = Row("vfx", "VFX");
+            if (vfx != null) ApplyVfx(vfx, "VFX", g);
             if (row.ContainsKey("debug_console_hold_seconds"))
                 Debug.Log("[KebammRemoteData] debug_console_hold_seconds=" + g.debugConsoleHoldSeconds.ToString(CultureInfo.InvariantCulture));
             return g;
+        }
+
+        /// <summary>Explosion Bits, Destroyed Fire and Goal Tracking shine values (Notion VFX table).</summary>
+        static void ApplyVfx(Dictionary<string, object> row, string table, KebammGameManagerData g)
+        {
+            SetFloat(row, "explosion_bit_size", table, "explosionBitSize", ref g.explosionBitSize);
+            SetInt(row, "explosion_bit_max_per_side", table, "explosionBitMaxPerSide", ref g.explosionBitMaxPerSide);
+            SetFloat(row, "explosion_bit_up_force_min", table, "explosionBitUpForceMin", ref g.explosionBitUpForceMin);
+            SetFloat(row, "explosion_bit_up_force_max", table, "explosionBitUpForceMax", ref g.explosionBitUpForceMax);
+            SetFloat(row, "explosion_bit_side_spread", table, "explosionBitSideSpread", ref g.explosionBitSideSpread);
+            SetFloat(row, "explosion_bit_gravity_min", table, "explosionBitGravityMin", ref g.explosionBitGravityMin);
+            SetFloat(row, "explosion_bit_gravity_max", table, "explosionBitGravityMax", ref g.explosionBitGravityMax);
+            SetFloat(row, "explosion_bit_lifetime", table, "explosionBitLifetime", ref g.explosionBitLifetime);
+            SetFloat(row, "destroyed_fire_scale", table, "destroyedFireScale", ref g.destroyedFireScale);
+            SetFloat(row, "destroyed_fire_lifetime_scale", table, "destroyedFireLifetimeScale", ref g.destroyedFireLifetimeScale);
+            SetFloat(row, "destroyed_fire_speed_scale", table, "destroyedFireSpeedScale", ref g.destroyedFireSpeedScale);
+            SetFloat(row, "goal_shine_duration", table, "goalShineDuration", ref g.goalShineDuration);
+            SetFloat(row, "goal_shine_interval", table, "goalShineInterval", ref g.goalShineInterval);
+            SetFloat(row, "goal_shine_alpha", table, "goalShineAlpha", ref g.goalShineAlpha);
+            SetFloat(row, "goal_shine_thickness", table, "goalShineThickness", ref g.goalShineThickness);
+            SetFloat(row, "title_shine_duration", table, "titleShineDuration", ref g.titleShineDuration);
+            SetFloat(row, "title_shine_interval", table, "titleShineInterval", ref g.titleShineInterval);
+            SetFloat(row, "title_shine_alpha", table, "titleShineAlpha", ref g.titleShineAlpha);
+            SetFloat(row, "title_shine_thickness", table, "titleShineThickness", ref g.titleShineThickness);
+            SetInt(row, "destroyed_fire_points_min", table, "destroyedFirePointsMin", ref g.destroyedFirePointsMin);
+            SetInt(row, "destroyed_fire_points_max", table, "destroyedFirePointsMax", ref g.destroyedFirePointsMax);
+            SetInt(row, "explosion_bit_max_on_screen", table, "explosionBitMaxOnScreen", ref g.explosionBitMaxOnScreen);
         }
 
         /// <summary>Combo Points override: table comboPointsData, rows combo_N { combo_count, combo_points } (Notion Combo Points).</summary>

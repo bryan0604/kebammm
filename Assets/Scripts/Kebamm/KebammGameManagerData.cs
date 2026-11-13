@@ -125,6 +125,56 @@ namespace Kebamm
         [Min(0.1f)] public float explosionBitLifetime = 1.2f;
         [Tooltip("Max bits on screen at once; the oldest are recycled first (Notion explosion_bit_max_on_screen). 0 = no bits.")]
         [Min(0)] public int explosionBitMaxOnScreen = 150;
+        [Header("Destroyed Fire VFX")]
+        [Tooltip("Looping fire played on a destroyed obstacle or trebuchet (local asset reference, not in Notion). Empty = no fire.")]
+        public GameObject destroyedFirePrefab;
+        [Tooltip("Fire size = this x the destroyed host's larger side (Notion destroyed_fire_scale). <= 0 = 0.35.")]
+        [Min(0f)] public float destroyedFireScale = 0.35f;
+        [Tooltip("Flame lifetime multiplier; lower = shorter flames (Notion destroyed_fire_lifetime_scale). <= 0 = 0.5.")]
+        [Min(0f)] public float destroyedFireLifetimeScale = 0.5f;
+        [Tooltip("Playback speed of the destroyed fire; 0.5 = half speed (Notion destroyed_fire_speed_scale). <= 0 = 0.5.")]
+        [Min(0f)] public float destroyedFireSpeedScale = 0.5f;
+        [Tooltip("Fewest fire points on a destroyed obstacle or trebuchet (Notion destroyed_fire_points_min). 0 = no fire.")]
+        [Min(0)] public int destroyedFirePointsMin = 1;
+        [Tooltip("Most fire points on a destroyed obstacle or trebuchet; a random count between min and max is picked (Notion destroyed_fire_points_max).")]
+        [Min(0)] public int destroyedFirePointsMax = 3;
+        [Header("Goal Tracking Shine (Notion Game Manager)")]
+        [Tooltip("Seconds for one light sweep up the player's bar (Notion goal_shine_duration). <= 0 = 0.6.")]
+        [Min(0f)] public float goalShineDuration = 0.6f;
+        [Tooltip("Pause in seconds between sweeps (Notion goal_shine_interval). < 0 = 2.")]
+        [Min(0f)] public float goalShineInterval = 2f;
+        [Tooltip("Brightness of the light strip, 0-1 (Notion goal_shine_alpha). 0 = no shine.")]
+        [Range(0f, 1f)] public float goalShineAlpha = 0.6f;
+        [Tooltip("Thickness of the light strip in UI pixels (Notion goal_shine_thickness). <= 0 = 36.")]
+        [Min(0f)] public float goalShineThickness = 36f;
+        [Header("Main Menu Title Shine (Notion VFX)")]
+        [Tooltip("Seconds for one light sweep across the title (Notion VFX title_shine_duration). <= 0 = 0.8.")]
+        [Min(0f)] public float titleShineDuration = 0.8f;
+        [Tooltip("Pause in seconds between title sweeps (Notion VFX title_shine_interval). < 0 = 3.")]
+        [Min(0f)] public float titleShineInterval = 3f;
+        [Tooltip("Brightness of the title light strip, 0-1 (Notion VFX title_shine_alpha). 0 = no shine.")]
+        [Range(0f, 1f)] public float titleShineAlpha = 0.7f;
+        [Tooltip("Width of the title light strip in UI pixels (Notion VFX title_shine_thickness). <= 0 = 60.")]
+        [Min(0f)] public float titleShineThickness = 60f;
+        [Header("Combo Box Glow (local tuning, not in Notion until the style is approved)")]
+        [Tooltip("Seconds the combo glow takes to fade out after each combo point gain. <= 0 = 0.45.")]
+        [Min(0f)] public float comboGlowDuration = 0.45f;
+        [Tooltip("Glow ring thickness around the combo box in UI pixels. <= 0 = 28.")]
+        [Min(0f)] public float comboGlowSize = 28f;
+        [Tooltip("Combo count at which the glow and bounce reach full strength (combo 1 = weakest).")]
+        [Min(1)] public int comboGlowMaxCombo = 6;
+        [Tooltip("Glow brightness at combo 1 (0-1).")]
+        [Range(0f, 1f)] public float comboGlowAlphaMin = 0.55f;
+        [Tooltip("Glow brightness at max combo (0-1).")]
+        [Range(0f, 1f)] public float comboGlowAlphaMax = 1f;
+        [Tooltip("Glow pop-out scale at combo 1.")]
+        [Min(1f)] public float comboGlowPopMin = 1.05f;
+        [Tooltip("Glow pop-out scale at max combo.")]
+        [Min(1f)] public float comboGlowPopMax = 1.2f;
+        [Tooltip("Box squash-and-stretch amount at combo 1 (0.08 = 8%). 0 = no bounce.")]
+        [Min(0f)] public float comboBounceMin = 0.08f;
+        [Tooltip("Box squash-and-stretch amount at max combo.")]
+        [Min(0f)] public float comboBounceMax = 0.18f;
         [Header("Coin Reward (local only, not in Notion)")]
         [Tooltip("Coins per monster killed this attempt. Local only; not exported to Notion or the Gist.")]
         public int coinPerKill = 8;
@@ -180,6 +230,22 @@ namespace Kebamm
         public float ExplosionBitGravityMax => Mathf.Max(0f, Mathf.Max(explosionBitGravityMin, explosionBitGravityMax));
         public float ExplosionBitLifetime => explosionBitLifetime > 0f ? Mathf.Max(0.1f, explosionBitLifetime) : 1.2f;
         public int ExplosionBitMaxOnScreen => Mathf.Max(0, explosionBitMaxOnScreen);
+        public float ComboGlowDuration => comboGlowDuration > 0f ? comboGlowDuration : 0.45f;
+        public float ComboGlowSize => comboGlowSize > 0f ? comboGlowSize : 28f;
+        public int ComboGlowMaxCombo => Mathf.Max(1, comboGlowMaxCombo);
+        public float TitleShineDuration => titleShineDuration > 0f ? Mathf.Max(0.05f, titleShineDuration) : 0.8f;
+        public float TitleShineInterval => titleShineInterval >= 0f ? titleShineInterval : 3f;
+        public float TitleShineAlpha => Mathf.Clamp01(titleShineAlpha);
+        public float TitleShineThickness => titleShineThickness > 0f ? titleShineThickness : 60f;
+        public float GoalShineDuration => goalShineDuration > 0f ? Mathf.Max(0.05f, goalShineDuration) : 0.6f;
+        public float GoalShineInterval => goalShineInterval >= 0f ? goalShineInterval : 2f;
+        public float GoalShineAlpha => Mathf.Clamp01(goalShineAlpha);
+        public float GoalShineThickness => goalShineThickness > 0f ? goalShineThickness : 36f;
+        public float DestroyedFireSpeedScale => destroyedFireSpeedScale > 0f ? destroyedFireSpeedScale : 0.5f;
+        public float DestroyedFireLifetimeScale => destroyedFireLifetimeScale > 0f ? destroyedFireLifetimeScale : 0.5f;
+        public int DestroyedFirePointsMin => Mathf.Max(0, Mathf.Min(destroyedFirePointsMin, destroyedFirePointsMax));
+        public int DestroyedFirePointsMax => Mathf.Max(0, Mathf.Max(destroyedFirePointsMin, destroyedFirePointsMax));
+        public float DestroyedFireScale => destroyedFireScale > 0f ? destroyedFireScale : 0.35f;
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));
         public float Star3Threshold => Mathf.Max(Star2Threshold, Mathf.Clamp01(star3Threshold));

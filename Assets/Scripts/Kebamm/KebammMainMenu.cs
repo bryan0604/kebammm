@@ -62,6 +62,10 @@ namespace Kebamm
         RectTransform[] _bubbles;
         RectTransform[] _bubbleShadows;
         Vector2[] _letterRest, _monsterRest, _bubbleRest;
+        RectTransform _titleRect;
+        RectTransform[] _letterShines; // light strip per letter, clipped to the letter shape (null for text fallbacks)
+        float _titleHalfWidth;
+        const float TitleShineTilt = -20f;
 
         public bool IsVisible => _root != null && _root.activeSelf;
 
@@ -295,6 +299,7 @@ namespace Kebamm
             titleGo.transform.SetParent(_root.transform, false);
             var titleRect = titleGo.AddComponent<RectTransform>();
             Place(titleRect, new Vector2(0f, 640f), new Vector2(1000f, 240f));
+            _titleRect = titleRect;
 
             KebammGameManagerData gm = MenuGameManager();
             float letterHeight = gm != null ? gm.TitleLetterHeight : 200f; // Game Manager "title letter height"
@@ -312,6 +317,8 @@ namespace Kebamm
             float fit = Mathf.Min(1f, 980f / total);
 
             _letters = new RectTransform[art.Length];
+            _letterShines = new RectTransform[art.Length];
+            _titleHalfWidth = total * fit * 0.5f;
             _letterRest = new Vector2[art.Length];
             float x = -total * fit * 0.5f;
             for (int i = 0; i < art.Length; i++)
@@ -323,6 +330,10 @@ namespace Kebamm
                     var img = CreateImage(titleRect, "Letter_" + art[i], sprites[i], Color.white);
                     img.preserveAspect = true;
                     rect = img.rectTransform;
+                    // Mask the letter so the title shine only lights the letter itself.
+                    img.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+                    var shine = CreateImage(rect, "Shine", TitleShineSprite, new Color(1f, 1f, 1f, 0f));
+                    _letterShines[i] = shine.rectTransform;
                 }
                 else
                 {
@@ -374,6 +385,8 @@ namespace Kebamm
                 }
             }
 
+            StartTitleShine();
+
             // Monsters: gentle float, different speeds and phases.
             if (_monsters != null)
             {
@@ -407,6 +420,79 @@ namespace Kebamm
                     up.Goto(phase[i], true);
                     shrink.Goto(phase[i], true);
                 }
+            }
+        }
+
+        // ---------- Title shine ----------
+
+        static Sprite _titleShineSprite;
+
+        /// <summary>White strip, transparent at both sides and bright in the middle (soft falloff across its width).</summary>
+        static Sprite TitleShineSprite
+        {
+            get
+            {
+                if (_titleShineSprite != null)
+                    return _titleShineSprite;
+                const int w = 32;
+                var tex = new Texture2D(w, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                for (int x = 0; x < w; x++)
+                {
+                    float a = Mathf.Sin(Mathf.PI * (x + 0.5f) / w);
+                    tex.SetPixel(x, 0, new Color(1f, 1f, 1f, a * a));
+                }
+                tex.Apply();
+                _titleShineSprite = Sprite.Create(tex, new Rect(0, 0, w, 1), new Vector2(0.5f, 0.5f), 100f);
+                return _titleShineSprite;
+            }
+        }
+
+        /// <summary>
+        /// One tilted light strip sweeps left to right across the whole title, then waits and repeats (VFX table
+        /// title_shine_*). Each letter carries its own strip, masked to the letter, placed at the same title-space x
+        /// so it reads as one sweep while the letters bob and pulse.
+        /// </summary>
+        void StartTitleShine()
+        {
+            if (_letterShines == null || _titleRect == null)
+                return;
+            KebammGameManagerData gm = MenuGameManager();
+            float duration = gm != null ? gm.TitleShineDuration : 0.8f;
+            float interval = gm != null ? gm.TitleShineInterval : 3f;
+            float alpha = gm != null ? gm.TitleShineAlpha : 0.7f;
+            float thickness = gm != null ? gm.TitleShineThickness : 60f;
+            for (int i = 0; i < _letterShines.Length; i++)
+            {
+                var s = _letterShines[i];
+                if (s == null)
+                    continue;
+                s.sizeDelta = new Vector2(thickness, _letters[i].rect.height * 1.8f);
+                s.GetComponent<Image>().color = new Color(1f, 1f, 1f, alpha);
+            }
+            float half = _titleHalfWidth + thickness * 2f;
+            PlaceTitleShine(-half);
+            if (alpha <= 0f)
+                return;
+            DOTween.Sequence()
+                .AppendInterval(1f)
+                .Append(DOVirtual.Float(-half, half, duration, PlaceTitleShine).SetEase(Ease.InOutSine))
+                .AppendInterval(interval)
+                .SetLoops(-1, LoopType.Restart).SetId(this).SetLink(_titleRect.gameObject);
+        }
+
+        void PlaceTitleShine(float titleX)
+        {
+            if (_letterShines == null || _titleRect == null)
+                return;
+            Vector3 world = _titleRect.TransformPoint(new Vector3(titleX, 0f, 0f));
+            for (int i = 0; i < _letterShines.Length; i++)
+            {
+                var s = _letterShines[i];
+                if (s == null)
+                    continue;
+                Vector3 local = _letters[i].InverseTransformPoint(world);
+                s.localPosition = new Vector3(local.x, 0f, 0f);
+                s.localRotation = Quaternion.Euler(0f, 0f, TitleShineTilt - _letters[i].localEulerAngles.z);
             }
         }
 

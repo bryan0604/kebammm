@@ -152,6 +152,7 @@ namespace Kebamm
                 Bounds bitsArea = _sr.bounds; // before the colliders switch off
                 _sr.color = DestroyedColour;
                 KebammExplosionBits.Burst(bitsArea, BaseColour, GetComponent<Collider2D>());
+                KebammDestroyedFire.Spawn(transform, bitsArea);
                 KebammScore.AddObstacleDestroy(_data.destroyedPts);
                 BecomeRubble();
             }

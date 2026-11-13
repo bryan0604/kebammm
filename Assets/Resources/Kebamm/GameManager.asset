@@ -56,5 +56,28 @@ MonoBehaviour:
   explosionBitGravityMax: 2
   explosionBitLifetime: 1.2
   explosionBitMaxOnScreen: 150
+  destroyedFirePrefab: {fileID: 8764043878647920493, guid: c4ed38c72957f2241ad144a1614956d9, type: 3}
+  destroyedFireScale: 0.35
+  destroyedFireLifetimeScale: 0.5
+  destroyedFireSpeedScale: 0.5
+  destroyedFirePointsMin: 1
+  destroyedFirePointsMax: 3
+  goalShineDuration: 0.6
+  goalShineInterval: 2
+  goalShineAlpha: 0.6
+  goalShineThickness: 36
+  titleShineDuration: 0.8
+  titleShineInterval: 3
+  titleShineAlpha: 0.7
+  titleShineThickness: 60
+  comboGlowDuration: 0.45
+  comboGlowSize: 28
+  comboGlowMaxCombo: 6
+  comboGlowAlphaMin: 0.55
+  comboGlowAlphaMax: 1
+  comboGlowPopMin: 1.05
+  comboGlowPopMax: 1.2
+  comboBounceMin: 0.08
+  comboBounceMax: 0.18
   remoteDataUrl: https://gist.githubusercontent.com/bryan0604/e5d81b25e0da4571a131483f506f1b97/raw/kebamm_data.json
   remoteDataTimeoutSeconds: 5

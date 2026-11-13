@@ -84,6 +84,7 @@ namespace Kebamm
             public int block;
             public RectTransform root;
             public Image glow;
+            public RectTransform shine;
             public RectTransform check;
             public float height;
             public float x;
@@ -436,6 +437,20 @@ namespace Kebamm
                         ball.color = ball.color * AheadTint; // blocks ahead are dimmer
                 }
 
+                // Shine: a soft diagonal light strip clipped to the player's bar, swept upward after the landing.
+                if (current)
+                {
+                    root.gameObject.AddComponent<RectMask2D>();
+                    var shine = KebammPlaceholderUi.Box(root, "Shine", Color.white, false);
+                    shine.sprite = ShineSprite;
+                    RectTransform sr = shine.rectTransform;
+                    sr.anchorMin = sr.anchorMax = new Vector2(0.5f, 0f);
+                    sr.pivot = new Vector2(0.5f, 0.5f);
+                    sr.localRotation = Quaternion.Euler(0f, 0f, 25f);
+                    shine.gameObject.SetActive(false);
+                    bar.shine = sr;
+                }
+
                 int lastLevel = Mathf.Min((block + 1) * LevelsPerBlock, maxLevel);
                 TextMeshProUGUI range = MakeLabel(_barsRoot, "Range_" + (block + 1), $"{block * LevelsPerBlock + 1}-{lastLevel}", 22f,
                     new Vector2(x, BarBaseY - 36f), new Vector2(BarPitch, 30f),
@@ -468,6 +483,60 @@ namespace Kebamm
             return badge;
         }
 
+        // ---------- Bar shine ----------
+
+        static Sprite _shineSprite;
+
+        /// <summary>White strip, transparent at both long edges and bright in the middle (soft falloff).</summary>
+        static Sprite ShineSprite
+        {
+            get
+            {
+                if (_shineSprite != null)
+                    return _shineSprite;
+                const int h = 32;
+                var tex = new Texture2D(1, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                for (int y = 0; y < h; y++)
+                {
+                    float a = Mathf.Sin(Mathf.PI * (y + 0.5f) / h);
+                    tex.SetPixel(0, y, new Color(1f, 1f, 1f, a * a));
+                }
+                tex.Apply();
+                _shineSprite = Sprite.Create(tex, new Rect(0, 0, 1, h), new Vector2(0.5f, 0.5f), 100f);
+                return _shineSprite;
+            }
+        }
+
+        /// <summary>Loops the light strip from below the player's bar to above it, with a pause between sweeps.</summary>
+        void StartShine(Bar bar)
+        {
+            if (bar.shine == null)
+                return;
+            var boot = KebammPrototypeBootstrap.Instance;
+            var gm = boot != null ? boot.GameManagerData : null;
+            float duration = gm != null ? gm.GoalShineDuration : 0.6f;
+            float interval = gm != null ? gm.GoalShineInterval : 2f;
+            float alpha = gm != null ? gm.GoalShineAlpha : 0.6f;
+            float thickness = gm != null ? gm.GoalShineThickness : 36f;
+            if (alpha <= 0f)
+                return;
+
+            RectTransform sr = bar.shine;
+            var img = sr.GetComponent<Image>();
+            img.color = new Color(1f, 1f, 1f, alpha);
+            sr.sizeDelta = new Vector2(BarWidth * 2.5f, thickness);
+            float startY = -thickness * 2f;
+            float endY = bar.height + thickness * 2f;
+            sr.anchoredPosition = new Vector2(0f, startY);
+            sr.gameObject.SetActive(true);
+
+            DOTween.Sequence().SetUpdate(true).SetId(this)
+                .AppendInterval(0.35f)
+                .Append(sr.DOAnchorPosY(endY, duration).From(new Vector2(0f, startY)).SetEase(Ease.InOutSine))
+                .AppendInterval(interval)
+                .SetLoops(-1, LoopType.Restart);
+        }
+
         // ---------- Transition ----------
 
         void ResetPose()
@@ -485,6 +554,8 @@ namespace Kebamm
                 }
                 if (b.check != null)
                     b.check.localScale = Vector3.zero;
+                if (b.shine != null)
+                    b.shine.gameObject.SetActive(false);
             }
             _ball.anchoredPosition = BallStart;
             _ball.localScale = Vector3.one;
@@ -559,6 +630,7 @@ namespace Kebamm
                     .OnComplete(() => glow.DOFade(0.45f, 0.55f).SetEase(Ease.InOutSine).SetLoops(-1, LoopType.Yoyo).SetUpdate(true).SetId(this));
             }
 
+            StartShine(bar);
             Burst(end);
 
             // Cleared blocks get a check, one after another from the left.

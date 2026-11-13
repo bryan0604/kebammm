@@ -209,6 +209,7 @@ namespace Kebamm
             gameObject.SetActive(true); // a previous Off level may have switched the whole object off
             StopAllCoroutines();
             DOTween.Kill(this);
+            KebammDestroyedFire.Clear(transform); // the trebuchet is reused across levels, so last level's fires must go
             _flash = null;
             _level = level;
             _disabled = false;
@@ -494,6 +495,7 @@ namespace Kebamm
             for (int i = 0; i < _renderers.Length; i++)
                 if (_renderers[i] != null)
                     _renderers[i].color = DestroyedColour;
+            KebammDestroyedFire.Spawn(transform, _col.bounds); // before the collider switches off
             _col.enabled = false;
             Debug.Log("[Kebamm] Trebuchet destroyed: darkened, no more building or launches this level.");
         }

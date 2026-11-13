@@ -106,18 +106,37 @@ namespace Kebamm
         RectTransform _comboFill;
         TextMeshProUGUI _comboLabel;
         float _comboBarWidth = 360f; // from combo_config barWidth / barHeight when built
+        RectTransform _comboGlow;
+        Image _comboGlowImage;
+        Image _comboFillImage;
 
         void BuildComboBar(Transform parent)
         {
             KebammComboConfig cfg = KebammCombo.Config;
             _comboBarWidth = cfg.BarWidth;
             float barHeight = cfg.BarHeight;
+            // Centre pivot so the pulse and the cute bounce grow from the middle (top-left still at barPosition).
+            Vector2 centre = cfg.barPosition + new Vector2(_comboBarWidth * 0.5f, -barHeight * 0.5f);
+
+            // Combo glow sits behind the bar (created first so it draws underneath).
+            var glowGo = new GameObject("ComboGlow");
+            glowGo.transform.SetParent(parent, false);
+            _comboGlow = glowGo.AddComponent<RectTransform>();
+            _comboGlow.anchorMin = _comboGlow.anchorMax = new Vector2(0f, 1f);
+            _comboGlow.pivot = new Vector2(0.5f, 0.5f);
+            _comboGlow.anchoredPosition = centre;
+            _comboGlowImage = glowGo.AddComponent<Image>();
+            _comboGlowImage.sprite = ComboGlowSprite;
+            _comboGlowImage.type = Image.Type.Sliced;
+            _comboGlowImage.raycastTarget = false;
+            _comboGlowImage.color = new Color(1f, 1f, 1f, 0f);
+
             var root = new GameObject("ComboBar");
             root.transform.SetParent(parent, false);
             _comboBar = root.AddComponent<RectTransform>();
             _comboBar.anchorMin = _comboBar.anchorMax = new Vector2(0f, 1f);
-            _comboBar.pivot = new Vector2(0f, 1f);
-            _comboBar.anchoredPosition = cfg.barPosition;
+            _comboBar.pivot = new Vector2(0.5f, 0.5f);
+            _comboBar.anchoredPosition = centre;
             _comboBar.sizeDelta = new Vector2(_comboBarWidth, barHeight);
             var bg = root.AddComponent<Image>();
             bg.sprite = KebammVisualFactory.SquareSprite;
@@ -135,6 +154,7 @@ namespace Kebamm
             var fill = fillGo.AddComponent<Image>();
             fill.sprite = KebammVisualFactory.SquareSprite;
             fill.color = new Color(1f, 0.78f, 0.15f, 1f);
+            _comboFillImage = fill;
             fill.raycastTarget = false;
 
             _comboLabel = CreateLabel(root.transform, "ComboLabel", "Combo 0/100", cfg.barLabelFontSize,
@@ -165,6 +185,9 @@ namespace Kebamm
             if (_fillSeq != null && _fillSeq.IsActive())
                 _fillSeq.Kill(); // rapid merges: never stack tweens, continue from the shown value
             _fillSeq = null;
+
+            if (gain > 0 && isActiveAndEnabled)
+                GlowComboBar(KebammCombo.ComboCount, overflow);
 
             float dur = Mathf.Max(0f, cfg.barFillDuration);
             if (gain <= 0 || dur <= 0f || !isActiveAndEnabled)
@@ -198,11 +221,99 @@ namespace Kebamm
                 _comboLabel.text = $"Combo {Mathf.RoundToInt(_fillT * cap)}/{cap}";
         }
 
+        // ---- Combo glow + cute bounce (VFX Fine Tuning; local tuning in GameManager.asset until the style is approved) ----
+
+        static Sprite _comboGlowSprite;
+        const int GlowBorder = 24;
+
+        /// <summary>Soft ring: transparent in the middle, bright at the bar's edge, fading outward. 9-sliced around the bar.</summary>
+        static Sprite ComboGlowSprite
+        {
+            get
+            {
+                if (_comboGlowSprite != null)
+                    return _comboGlowSprite;
+                const int size = GlowBorder * 2 + 4;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                float lo = GlowBorder, hi = size - GlowBorder;
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++)
+                    {
+                        float px = x + 0.5f, py = y + 0.5f;
+                        float dx = Mathf.Max(lo - px, 0f, px - hi);
+                        float dy = Mathf.Max(lo - py, 0f, py - hi);
+                        float d = Mathf.Sqrt(dx * dx + dy * dy);
+                        bool inside = px > lo && px < hi && py > lo && py < hi;
+                        float a = inside ? 0f : Mathf.Clamp01(1f - d / GlowBorder);
+                        tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+                    }
+                tex.Apply();
+                _comboGlowSprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100f, 0,
+                    SpriteMeshType.FullRect, new Vector4(GlowBorder, GlowBorder, GlowBorder, GlowBorder));
+                return _comboGlowSprite;
+            }
+        }
+
+        Sequence _glowSeq;
+        Sequence _bounceSeq;
+
+        /// <summary>
+        /// Each combo point gain: a bar-coloured glow flashes around the box and fades, stronger as the combo climbs,
+        /// and the box does a squash-and-stretch bounce. When the bar fills, the existing bar pulse takes over the scale.
+        /// </summary>
+        void GlowComboBar(int combo, bool barFilled)
+        {
+            if (_comboBar == null || _comboGlow == null)
+                return;
+            KebammGameManagerData gm = KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
+            float duration = gm != null ? gm.ComboGlowDuration : 0.45f;
+            float size = gm != null ? gm.ComboGlowSize : 28f;
+            int maxCombo = gm != null ? gm.ComboGlowMaxCombo : 6;
+            float alphaMin = gm != null ? gm.comboGlowAlphaMin : 0.55f;
+            float alphaMax = gm != null ? gm.comboGlowAlphaMax : 1f;
+            float popMin = gm != null ? gm.comboGlowPopMin : 1.05f;
+            float popMax = gm != null ? gm.comboGlowPopMax : 1.2f;
+            float bounceMin = gm != null ? gm.comboBounceMin : 0.08f;
+            float bounceMax = gm != null ? gm.comboBounceMax : 0.18f;
+
+            // 0 at combo 1, 1 at max combo and beyond.
+            float s = maxCombo > 1 ? Mathf.Clamp01((combo - 1f) / (maxCombo - 1f)) : 1f;
+            float alpha = Mathf.Clamp01(Mathf.Lerp(alphaMin, alphaMax, s));
+            float pop = Mathf.Lerp(popMin, popMax, s);
+            float bounce = Mathf.Lerp(bounceMin, bounceMax, s);
+
+            // Glow: bar colour, ring as thick as "size" px around the box.
+            Color c = _comboFillImage != null ? _comboFillImage.color : new Color(1f, 0.78f, 0.15f, 1f);
+            _comboGlowImage.pixelsPerUnitMultiplier = GlowBorder / Mathf.Max(1f, size);
+            _comboGlow.sizeDelta = _comboBar.sizeDelta + Vector2.one * size * 2f;
+            if (_glowSeq != null && _glowSeq.IsActive())
+                _glowSeq.Kill();
+            _comboGlow.localScale = Vector3.one * 0.92f;
+            _comboGlowImage.color = new Color(c.r, c.g, c.b, alpha);
+            _glowSeq = DOTween.Sequence().SetLink(_comboGlow.gameObject)
+                .Append(_comboGlow.DOScale(pop, 0.12f).SetEase(Ease.OutBack))
+                .Join(_comboGlowImage.DOFade(0f, Mathf.Max(0.05f, duration)).SetEase(Ease.InQuad))
+                .Insert(0.12f, _comboGlow.DOScale(1f, Mathf.Max(0.05f, duration - 0.12f)).SetEase(Ease.OutQuad));
+
+            if (barFilled || bounce <= 0f)
+                return; // the bar-filled pulse handles the box scale
+            if (_bounceSeq != null && _bounceSeq.IsActive())
+                _bounceSeq.Kill();
+            _comboBar.DOKill();
+            _comboBar.localScale = Vector3.one;
+            _bounceSeq = DOTween.Sequence().SetTarget(_comboBar).SetLink(_comboBar.gameObject)
+                .Append(_comboBar.DOScale(new Vector3(1f + bounce, 1f - bounce, 1f), 0.07f).SetEase(Ease.OutQuad))
+                .Append(_comboBar.DOScale(new Vector3(1f - bounce * 0.6f, 1f + bounce * 0.6f, 1f), 0.08f).SetEase(Ease.InOutQuad))
+                .Append(_comboBar.DOScale(Vector3.one, 0.3f).SetEase(Ease.OutElastic));
+        }
+
         void PulseComboBar(int fills)
         {
             if (_comboBar == null)
                 return;
             KebammComboConfig cfg = KebammCombo.Config;
+            if (_bounceSeq != null && _bounceSeq.IsActive())
+                _bounceSeq.Kill();
             _comboBar.DOKill();
             _comboBar.localScale = Vector3.one;
             _comboBar.DOScale(Mathf.Max(1f, cfg.barPulseScale), Mathf.Max(0.02f, cfg.barPulseDuration))
