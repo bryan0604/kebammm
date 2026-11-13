@@ -400,6 +400,15 @@ namespace Kebamm
             SetFloat(row, "title_shine_interval", table, "titleShineInterval", ref g.titleShineInterval);
             SetFloat(row, "title_shine_alpha", table, "titleShineAlpha", ref g.titleShineAlpha);
             SetFloat(row, "title_shine_thickness", table, "titleShineThickness", ref g.titleShineThickness);
+            SetFloat(row, "combo_glow_duration", table, "comboGlowDuration", ref g.comboGlowDuration);
+            SetFloat(row, "combo_glow_size", table, "comboGlowSize", ref g.comboGlowSize);
+            SetInt(row, "combo_glow_max_combo", table, "comboGlowMaxCombo", ref g.comboGlowMaxCombo);
+            SetFloat(row, "combo_glow_alpha_min", table, "comboGlowAlphaMin", ref g.comboGlowAlphaMin);
+            SetFloat(row, "combo_glow_alpha_max", table, "comboGlowAlphaMax", ref g.comboGlowAlphaMax);
+            SetFloat(row, "combo_glow_pop_min", table, "comboGlowPopMin", ref g.comboGlowPopMin);
+            SetFloat(row, "combo_glow_pop_max", table, "comboGlowPopMax", ref g.comboGlowPopMax);
+            SetFloat(row, "combo_bounce_min", table, "comboBounceMin", ref g.comboBounceMin);
+            SetFloat(row, "combo_bounce_max", table, "comboBounceMax", ref g.comboBounceMax);
             SetInt(row, "destroyed_fire_points_min", table, "destroyedFirePointsMin", ref g.destroyedFirePointsMin);
             SetInt(row, "destroyed_fire_points_max", table, "destroyedFirePointsMax", ref g.destroyedFirePointsMax);
             SetInt(row, "explosion_bit_max_on_screen", table, "explosionBitMaxOnScreen", ref g.explosionBitMaxOnScreen);

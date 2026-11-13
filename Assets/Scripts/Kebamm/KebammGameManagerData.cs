@@ -156,7 +156,15 @@ namespace Kebamm
         [Range(0f, 1f)] public float titleShineAlpha = 0.7f;
         [Tooltip("Width of the title light strip in UI pixels (Notion VFX title_shine_thickness). <= 0 = 60.")]
         [Min(0f)] public float titleShineThickness = 60f;
-        [Header("Combo Box Glow (local tuning, not in Notion until the style is approved)")]
+        [Header("Drop Burst VFX (local tuning, not in Notion until the style is approved)")]
+        [Tooltip("Burst played where a dropped ball first touches with its bottom side (local asset reference, not in Notion). Empty = no burst.")]
+        public GameObject dropBurstPrefab;
+        [Tooltip("Burst size = this x the ball's diameter. <= 0 = 1.")]
+        [Min(0f)] public float dropBurstScale = 1f;
+        [Tooltip("How many bursts are pre-made and reused (most that can play at once). <= 0 = 6.")]
+        [Min(0)] public int dropBurstPoolSize = 6;
+
+        [Header("Combo Box Glow (Notion VFX)")]
         [Tooltip("Seconds the combo glow takes to fade out after each combo point gain. <= 0 = 0.45.")]
         [Min(0f)] public float comboGlowDuration = 0.45f;
         [Tooltip("Glow ring thickness around the combo box in UI pixels. <= 0 = 28.")]
@@ -245,6 +253,8 @@ namespace Kebamm
         public float DestroyedFireLifetimeScale => destroyedFireLifetimeScale > 0f ? destroyedFireLifetimeScale : 0.5f;
         public int DestroyedFirePointsMin => Mathf.Max(0, Mathf.Min(destroyedFirePointsMin, destroyedFirePointsMax));
         public int DestroyedFirePointsMax => Mathf.Max(0, Mathf.Max(destroyedFirePointsMin, destroyedFirePointsMax));
+        public float DropBurstScale => dropBurstScale > 0f ? dropBurstScale : 1f;
+        public int DropBurstPoolSize => dropBurstPoolSize > 0 ? dropBurstPoolSize : 6;
         public float DestroyedFireScale => destroyedFireScale > 0f ? destroyedFireScale : 0.35f;
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));

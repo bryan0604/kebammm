@@ -55,6 +55,10 @@ namespace Kebamm
         /// <summary>Play state: true from this ball's first contact with another ball, the floor or a wall (merged balls inherit it).</summary>
         public bool InPlay { get; set; }
 
+        // Drop burst VFX: set when the player drops this ball; cleared on its first bottom-side touch.
+        bool _awaitingDropTouch;
+        public void MarkDropped() { _awaitingDropTouch = true; }
+
         void OnDestroy()
         {
             if (_registered)
@@ -272,6 +276,24 @@ namespace Kebamm
                 InPlay = true;
         }
 
+        // Drop burst: plays once, only where the dropped ball touches with its bottom side (a contact below its
+        // centre), so side bumps against walls or neighbours don't puff.
+        void TryDropBurst(Collision2D collision)
+        {
+            float centreY = transform.position.y;
+            float r = _col != null ? _col.bounds.extents.y : transform.lossyScale.y * 0.5f;
+            for (int i = 0; i < collision.contactCount; i++)
+            {
+                Vector2 p = collision.GetContact(i).point;
+                if (p.y < centreY - r * 0.5f)
+                {
+                    _awaitingDropTouch = false;
+                    KebammDropBurst.Play(new Vector3(p.x, p.y, 0f), r * 2f);
+                    return;
+                }
+            }
+        }
+
         void OnCollisionEnter2D(Collision2D collision)
         {
             if (IsPreview)
@@ -287,6 +309,8 @@ namespace Kebamm
             }
             if (Spent)
                 return;
+            if (_awaitingDropTouch && !collision.collider.isTrigger && !IsMerging)
+                TryDropBurst(collision);
             var other = collision.collider.GetComponent<KebammBall>();
             // In play only from a real contact: floor, wall or any non-ball solid, or a ball that is already in play.
             // Touching another still-falling ball does not count (spam-drop bombing bug).

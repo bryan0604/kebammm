@@ -958,6 +958,7 @@ namespace Kebamm
                 return preview;
             }
             preview.Configure(preview.Colour, preview.Tier, preview: false);
+            preview.MarkDropped(); // drop burst VFX on its first bottom touch
             ResetBombingIdleTimer();
             KebammFrameSpikeLog.Drops++;
             KebammScore.CountBall(preview.Tier);

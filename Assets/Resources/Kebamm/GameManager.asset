@@ -70,6 +70,9 @@ MonoBehaviour:
   titleShineInterval: 3
   titleShineAlpha: 0.7
   titleShineThickness: 60
+  dropBurstPrefab: {fileID: 1429954232896169633, guid: 83036083a4ebcd34f98131bd3cf6f4d2, type: 3}
+  dropBurstScale: 0.4
+  dropBurstPoolSize: 6
   comboGlowDuration: 0.45
   comboGlowSize: 28
   comboGlowMaxCombo: 6
