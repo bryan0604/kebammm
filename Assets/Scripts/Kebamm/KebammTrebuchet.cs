@@ -487,6 +487,10 @@ namespace Kebamm
             for (int i = KebammRock.Live.Count - 1; i >= 0; i--) // a toss cut short must not leave a rock hanging in the air
                 if (KebammRock.Live[i] != null && !KebammRock.Live[i].Landed)
                     KebammRock.Live[i].Land();
+            // Explosion Bits: each visible part bursts in its own colour.
+            for (int i = 0; i < _renderers.Length; i++)
+                if (_renderers[i] != null && _renderers[i].enabled && _renderers[i].gameObject.activeInHierarchy && _renderers[i].sprite != null)
+                    KebammExplosionBits.Burst(_renderers[i].bounds, _baseColours[i], _col);
             for (int i = 0; i < _renderers.Length; i++)
                 if (_renderers[i] != null)
                     _renderers[i].color = DestroyedColour;

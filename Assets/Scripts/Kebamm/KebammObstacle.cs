@@ -149,7 +149,9 @@ namespace Kebamm
             if (_health <= 0f)
             {
                 _destroyed = true;
+                Bounds bitsArea = _sr.bounds; // before the colliders switch off
                 _sr.color = DestroyedColour;
+                KebammExplosionBits.Burst(bitsArea, BaseColour, GetComponent<Collider2D>());
                 KebammScore.AddObstacleDestroy(_data.destroyedPts);
                 BecomeRubble();
             }

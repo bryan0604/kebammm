@@ -19,6 +19,10 @@ namespace Kebamm
         Color _hitFlashColor = Color.white;
         bool _usesArt;
         Coroutine _flashRoutine;
+        // GDD Explosion Bits: a monster hit by a ball or bomb blinks red (twice).
+        static readonly Color HitBlinkRed = new Color(1f, 0.2f, 0.2f, 1f);
+        const float HitBlinkOn = 0.07f;
+        const float HitBlinkOff = 0.05f;
         bool _defeated;
 
         // Ball impact bounce: launched up + away from the hit side, spins on Z, then settles upright where it lands.
@@ -101,12 +105,12 @@ namespace Kebamm
             {
                 _sr.sprite = art;
                 _baseColor = KebammMonsterVisuals.TintFor();
-                _hitFlashColor = KebammMonsterVisuals.HitFlashFor();
+                _hitFlashColor = HitBlinkRed;
             }
             else
             {
                 _baseColor = KebammVisualFactory.ColourFor(colour);
-                _hitFlashColor = Color.white;
+                _hitFlashColor = HitBlinkRed;
             }
             _sr.color = _baseColor;
         }
@@ -380,15 +384,24 @@ namespace Kebamm
                     KebammScore.AddDestroy(_destroyedPts);
                 Debug.Log("[Kebamm] Monster defeated");
                 _sr.color = new Color(0.25f, 0.25f, 0.25f);
+                // Explosion Bits in the monster's colour (blue monster = blue bits).
+                KebammExplosionBits.Burst(_sr.bounds, KebammVisualFactory.ColourFor(colour), GetComponent<Collider2D>());
             }
         }
 
         IEnumerator Flash()
         {
-            _sr.color = _hitFlashColor;
-            yield return new WaitForSeconds(0.08f);
-            if (!_defeated)
-                _sr.color = _baseColor;
+            for (int i = 0; i < 2; i++)
+            {
+                if (_defeated)
+                    break;
+                _sr.color = _hitFlashColor;
+                yield return new WaitForSeconds(HitBlinkOn);
+                if (!_defeated)
+                    _sr.color = _baseColor;
+                if (i == 0)
+                    yield return new WaitForSeconds(HitBlinkOff);
+            }
             _flashRoutine = null;
         }
 

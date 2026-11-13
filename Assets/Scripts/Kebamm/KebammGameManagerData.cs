@@ -106,6 +106,25 @@ namespace Kebamm
         [Min(0.1f)] public float maxCapHitBlinkSpeedMultiplier = 1.5f;
         [Tooltip("Seconds between a ball hitting the Max Cap Line and the bombing run starting; drops are blocked meanwhile (Notion max_cap_hit_delay_seconds). <= 0 = 1.5.")]
         [Min(0.1f)] public float maxCapHitDelaySeconds = 1.5f;
+        [Header("Explosion Bits (Notion Game Manager)")]
+        [Tooltip("Square bit size in world units. A destroyed host bursts into (width / size) x (height / size) bits (Notion explosion_bit_size). <= 0 = 0.2.")]
+        [Min(0.02f)] public float explosionBitSize = 0.2f;
+        [Tooltip("Max bits along each side of a destroyed host, so a big host or tiny bit size can't flood the screen (Notion explosion_bit_max_per_side). <= 0 = 12.")]
+        [Min(1)] public int explosionBitMaxPerSide = 12;
+        [Tooltip("Lowest upward launch speed of a bit, world units/s (Notion explosion_bit_up_force_min).")]
+        [Min(0f)] public float explosionBitUpForceMin = 4f;
+        [Tooltip("Highest upward launch speed of a bit, world units/s (Notion explosion_bit_up_force_max).")]
+        [Min(0f)] public float explosionBitUpForceMax = 8f;
+        [Tooltip("Max sideways launch speed, world units/s; bits on the left of the host lean left, right lean right (Notion explosion_bit_side_spread).")]
+        [Min(0f)] public float explosionBitSideSpread = 3f;
+        [Tooltip("Lowest gravity scale of a bit (x world gravity), so bits fall at different rates (Notion explosion_bit_gravity_min).")]
+        [Min(0f)] public float explosionBitGravityMin = 1f;
+        [Tooltip("Highest gravity scale of a bit (Notion explosion_bit_gravity_max).")]
+        [Min(0f)] public float explosionBitGravityMax = 2f;
+        [Tooltip("Seconds a bit lives; it fades out over the last third (Notion explosion_bit_lifetime). <= 0 = 1.2.")]
+        [Min(0.1f)] public float explosionBitLifetime = 1.2f;
+        [Tooltip("Max bits on screen at once; the oldest are recycled first (Notion explosion_bit_max_on_screen). 0 = no bits.")]
+        [Min(0)] public int explosionBitMaxOnScreen = 150;
         [Header("Coin Reward (local only, not in Notion)")]
         [Tooltip("Coins per monster killed this attempt. Local only; not exported to Notion or the Gist.")]
         public int coinPerKill = 8;
@@ -152,6 +171,15 @@ namespace Kebamm
         public float MaxCapLineBlinkHalfPeriod => maxCapLineBlinkHalfPeriod > 0f ? maxCapLineBlinkHalfPeriod : 0.25f;
         public float MaxCapHitBlinkSpeedMultiplier => maxCapHitBlinkSpeedMultiplier > 0f ? maxCapHitBlinkSpeedMultiplier : 1.5f;
         public float MaxCapHitDelaySeconds => maxCapHitDelaySeconds > 0f ? maxCapHitDelaySeconds : 1.5f;
+        public float ExplosionBitSize => explosionBitSize > 0f ? Mathf.Max(0.02f, explosionBitSize) : 0.2f;
+        public int ExplosionBitMaxPerSide => explosionBitMaxPerSide > 0 ? explosionBitMaxPerSide : 12;
+        public float ExplosionBitUpForceMin => Mathf.Max(0f, Mathf.Min(explosionBitUpForceMin, explosionBitUpForceMax));
+        public float ExplosionBitUpForceMax => Mathf.Max(0f, Mathf.Max(explosionBitUpForceMin, explosionBitUpForceMax));
+        public float ExplosionBitSideSpread => Mathf.Max(0f, explosionBitSideSpread);
+        public float ExplosionBitGravityMin => Mathf.Max(0f, Mathf.Min(explosionBitGravityMin, explosionBitGravityMax));
+        public float ExplosionBitGravityMax => Mathf.Max(0f, Mathf.Max(explosionBitGravityMin, explosionBitGravityMax));
+        public float ExplosionBitLifetime => explosionBitLifetime > 0f ? Mathf.Max(0.1f, explosionBitLifetime) : 1.2f;
+        public int ExplosionBitMaxOnScreen => Mathf.Max(0, explosionBitMaxOnScreen);
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));
         public float Star3Threshold => Mathf.Max(Star2Threshold, Mathf.Clamp01(star3Threshold));
