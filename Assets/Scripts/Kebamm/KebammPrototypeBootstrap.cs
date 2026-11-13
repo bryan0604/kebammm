@@ -222,6 +222,7 @@ namespace Kebamm
         public void DeleteSaveAndRestart()
         {
             KebammSaveSystem.DeleteAndReset();
+            KebammGoalTracking.ClearShownDate(); // fresh player: Goal Tracking may auto-show again
             KebammAudio.Refresh(); // fresh save: Sound / Music back to ON
             _levelIndex = 0;
             if (KebammScoreHud.Instance != null)
@@ -236,6 +237,7 @@ namespace Kebamm
         public void ResetProgressAndRestart()
         {
             KebammSaveSystem.ResetProgress();
+            KebammGoalTracking.ClearShownDate();
             _levelIndex = 0;
             if (KebammScoreHud.Instance != null)
                 KebammScoreHud.Instance.RefreshLevel();

@@ -12,7 +12,7 @@ namespace Kebamm
     /// Developer cheat console (GDD: Debug Console). Backquote opens/closes on desktop/Editor,
     /// three-finger hold on mobile: 3+ fingers currently in the top 37.5% of the screen, held for more than 5 s.
     /// Compiled only in the Editor and development builds.
-    /// Commands: start N, jump N, next, prev, restart, win, save, deletesave [confirm], resetprogress [confirm], unlockall, setstars N S, bomb [N], help.
+    /// Commands: start N, jump N, next, prev, restart, win, save, deletesave [confirm], resetprogress [confirm], unlockall, setstars N S, resetgoal, bomb [N], help.
     /// </summary>
     public class KebammDebugConsole : MonoBehaviour
     {
@@ -282,7 +282,7 @@ namespace Kebamm
             {
                 case "help":
                     Print("start N / jump N (keeps other level progress) | next | prev | restart | win | bomb [N] | help");
-                    Print("save | deletesave | resetprogress | unlockall | setstars N S");
+                    Print("save | deletesave | resetprogress | unlockall | setstars N S | resetgoal");
                     Print("Levels: " + b.LevelNumbersText);
                     break;
 
@@ -411,6 +411,11 @@ namespace Kebamm
                     }
                     else
                         Error("Usage: resetprogress confirm");
+                    break;
+
+                case "resetgoal":
+                    KebammGoalTracking.ClearShownDate();
+                    Print("Goal Tracking last-shown date cleared. It auto-shows on the next app run's main menu.");
                     break;
 
                 case "unlockall":

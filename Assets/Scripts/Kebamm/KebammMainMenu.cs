@@ -77,6 +77,10 @@ namespace Kebamm
         string _shownName;
         int _shownStars = -1;
         TextMeshProUGUI _updateText;
+        KebammGoalTracking _goal;
+        UnityEngine.UI.Button _goalButton;
+        // Goal Tracking auto-shows at most once per app run (the first main menu), and then only once per local day.
+        static bool _goalSessionChecked;
         static TMP_FontAsset _font;
         static bool _fontTried;
         static TMP_FontAsset _lilitaFont;
@@ -87,6 +91,12 @@ namespace Kebamm
         static readonly Color StartGreen = new Color(0.36f, 0.75f, 0.18f);
         static readonly Color SettingsFill = new Color(0.96f, 0.94f, 1f);
         static readonly Color SettingsText = new Color(0.30f, 0.15f, 0.55f);
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            _goalSessionChecked = false;
+        }
 
         void Awake()
         {
@@ -188,6 +198,8 @@ namespace Kebamm
             dataRect.anchoredPosition = new Vector2(-20f, 16f);
 
             BuildPlayerPanel();
+            BuildGoalButton();
+            BuildGoalPopup(canvasGo.transform);
             BuildSettingsPlaceholder(canvasGo.transform);
             BuildUpdatePrompt(canvasGo.transform);
             RefreshLevel();
@@ -440,35 +452,159 @@ namespace Kebamm
 
         // PLACEHOLDER Player Information Panel (Notion: Main Menu > Player Information Panel), top-left, not clickable.
         // Picture = placeholder circle until art; stars = total best stars across all levels.
+        // Player Information Panel as one horizontal bar along the top, so it stays clear of the game title
+        // (Notion ticket: Game UI - Player Information Panel). Row: picture, then name, stars and coins spread
+        // across the rest of the bar (the name gets a little more room than each resource).
+        // The Goal button sits right below the profile picture.
+        const float TopBarMargin = 30f;
+        const float TopBarHeight = 110f;
+        const float PictureSize = 84f;
+        const float PictureCentreX = 62f;      // from the bar's left edge
+        const float RowLeft = 120f;            // name / resources area starts right of the picture
+        const float RowRight = 20f;
+        const float NameShare = 1.3f;          // name : stars : coins = 1.3 : 1 : 1
+        const float GoalButtonWidth = 170f;
+        const float GoalButtonHeight = 64f;
+        const float TopBarGap = 14f;
+
         void BuildPlayerPanel()
         {
             var panel = KebammPlaceholderUi.Box(_safe, "PlayerInfoPanel", new Color(0f, 0f, 0f, 0.45f), false);
             RectTransform pr = panel.rectTransform;
-            pr.anchorMin = pr.anchorMax = pr.pivot = new Vector2(0f, 1f);
-            pr.anchoredPosition = new Vector2(30f, -30f);
-            pr.sizeDelta = new Vector2(500f, 200f);
+            pr.anchorMin = new Vector2(0f, 1f);
+            pr.anchorMax = new Vector2(1f, 1f);
+            pr.pivot = new Vector2(0f, 1f);
+            pr.sizeDelta = new Vector2(0f, TopBarHeight);
+            pr.anchoredPosition = new Vector2(0f, -TopBarMargin);
+            pr.offsetMin = new Vector2(TopBarMargin, pr.offsetMin.y);
+            pr.offsetMax = new Vector2(-TopBarMargin, pr.offsetMax.y);
 
             var picture = KebammPlaceholderUi.Box(panel.transform, "PlayerPicture", new Color(0.85f, 0.80f, 0.95f), false);
             picture.sprite = KebammVisualFactory.CircleSprite;
             picture.preserveAspect = true;
-            KebammPlaceholderUi.Place(picture.rectTransform, new Vector2(-170f, 0f), new Vector2(120f, 120f));
+            RectTransform pic = picture.rectTransform;
+            pic.anchorMin = pic.anchorMax = new Vector2(0f, 0.5f);
+            pic.pivot = new Vector2(0.5f, 0.5f);
+            pic.anchoredPosition = new Vector2(PictureCentreX, 0f);
+            pic.sizeDelta = new Vector2(PictureSize, PictureSize);
 
-            _playerName = KebammPlaceholderUi.Label(panel.transform, "Username", "", 38f, new Vector2(70f, 55f), new Vector2(330f, 56f), Color.white);
+            // Row area right of the picture, split into name / stars / coins sections.
+            var row = KebammPlaceholderUi.Rect(panel.transform, "InfoRow");
+            row.anchorMin = new Vector2(0f, 0f);
+            row.anchorMax = new Vector2(1f, 1f);
+            row.offsetMin = new Vector2(RowLeft, 0f);
+            row.offsetMax = new Vector2(-RowRight, 0f);
+            float total = NameShare + 2f;
+            float nameEnd = NameShare / total;
+            float starsEnd = (NameShare + 1f) / total;
+
+            RectTransform nameSection = Section(row, "NameSection", 0f, nameEnd);
+            _playerName = KebammPlaceholderUi.Label(nameSection, "Username", "", 38f, Vector2.zero, Vector2.zero, Color.white);
             _playerName.alignment = TextAlignmentOptions.Left;
             _playerName.fontStyle = FontStyles.Bold;
-            var starIcon = KebammPlaceholderUi.Box(panel.transform, "StarIcon", Color.white, false);
-            starIcon.sprite = Resources.Load<Sprite>("Kebamm/UI/star_icon");
-            starIcon.preserveAspect = true;
-            KebammPlaceholderUi.Place(starIcon.rectTransform, new Vector2(-75f, 5f), new Vector2(40f, 40f));
-            _playerStars = KebammPlaceholderUi.Label(panel.transform, "Stars", "", 34f, new Vector2(100f, 5f), new Vector2(300f, 50f), new Color(1f, 0.86f, 0.3f));
-            _playerStars.alignment = TextAlignmentOptions.Left;
-            var coinIcon = KebammPlaceholderUi.Box(panel.transform, "CoinIcon", Color.white, false);
-            coinIcon.sprite = Resources.Load<Sprite>("Kebamm/UI/coin_icon");
-            coinIcon.preserveAspect = true;
-            KebammPlaceholderUi.Place(coinIcon.rectTransform, new Vector2(-75f, -50f), new Vector2(40f, 40f));
-            _playerCoins = KebammPlaceholderUi.Label(panel.transform, "Coins", "", 34f, new Vector2(100f, -50f), new Vector2(300f, 50f), new Color(1f, 0.86f, 0.3f));
-            _playerCoins.alignment = TextAlignmentOptions.Left;
+            _playerName.enableAutoSizing = true;
+            _playerName.fontSizeMin = 22f;
+            _playerName.fontSizeMax = 38f;
+            FillSection(_playerName.rectTransform, 0f, 12f);
+
+            Color resourceText = new Color(1f, 0.86f, 0.3f);
+            _playerStars = BuildResource(Section(row, "StarsSection", nameEnd, starsEnd), "Star", "Kebamm/UI/star_icon", resourceText);
+            _playerCoins = BuildResource(Section(row, "CoinsSection", starsEnd, 1f), "Coin", "Kebamm/UI/coin_icon", resourceText);
             RefreshPlayerPanel();
+        }
+
+        /// <summary>A full-height slice of the row between two horizontal fractions.</summary>
+        static RectTransform Section(RectTransform row, string name, float from, float to)
+        {
+            RectTransform r = KebammPlaceholderUi.Rect(row, name);
+            r.anchorMin = new Vector2(from, 0f);
+            r.anchorMax = new Vector2(to, 1f);
+            r.pivot = new Vector2(0.5f, 0.5f);
+            r.offsetMin = Vector2.zero;
+            r.offsetMax = Vector2.zero;
+            return r;
+        }
+
+        static void FillSection(RectTransform rect, float left, float right)
+        {
+            rect.anchorMin = new Vector2(0f, 0f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.offsetMin = new Vector2(left, 0f);
+            rect.offsetMax = new Vector2(-right, 0f);
+        }
+
+        /// <summary>Icon on the left of the section, value right next to it.</summary>
+        static TextMeshProUGUI BuildResource(RectTransform section, string name, string iconPath, Color colour)
+        {
+            const float iconSize = 44f;
+            var icon = KebammPlaceholderUi.Box(section, name + "Icon", Color.white, false);
+            icon.sprite = Resources.Load<Sprite>(iconPath);
+            icon.preserveAspect = true;
+            RectTransform ir = icon.rectTransform;
+            ir.anchorMin = ir.anchorMax = new Vector2(0f, 0.5f);
+            ir.pivot = new Vector2(0f, 0.5f);
+            ir.anchoredPosition = Vector2.zero;
+            ir.sizeDelta = new Vector2(iconSize, iconSize);
+            TextMeshProUGUI label = KebammPlaceholderUi.Label(section, name + "s", "", 34f, Vector2.zero, Vector2.zero, colour);
+            label.alignment = TextAlignmentOptions.Left;
+            label.enableAutoSizing = true;
+            label.fontSizeMin = 20f;
+            label.fontSizeMax = 34f;
+            FillSection(label.rectTransform, iconSize + 8f, 4f);
+            return label;
+        }
+
+        // Goal button right below the profile picture (Notion: Game Goal - Your Performance vs All).
+        // Hidden until level 1 is completed. Opens Goal Tracking and replays the transition.
+        void BuildGoalButton()
+        {
+            _goalButton = KebammPlaceholderUi.MakeButton(_safe, "GoalButton", "Goal", new Color(0.95f, 0.60f, 0.10f),
+                Vector2.zero, new Vector2(GoalButtonWidth, GoalButtonHeight), OnGoalPressed, 38f);
+            var rect = (RectTransform)_goalButton.transform;
+            rect.anchorMin = rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(TopBarMargin + PictureCentreX, -(TopBarMargin + TopBarHeight + TopBarGap));
+            TextMeshProUGUI label = _goalButton.GetComponentInChildren<TextMeshProUGUI>();
+            TMP_FontAsset lilita = GetLilitaFont();
+            if (label != null && lilita != null)
+                label.font = lilita;
+            _goalButton.gameObject.SetActive(false);
+        }
+        void BuildGoalPopup(Transform parent)
+        {
+            var go = new GameObject("GoalTracking", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            KebammPlaceholderUi.Stretch((RectTransform)go.transform); // full-screen so the popup centres and the dimmer covers everything
+            _goal = go.AddComponent<KebammGoalTracking>();
+            _goal.Build(go.transform);
+        }
+
+        void OnGoalPressed()
+        {
+            if (_goal != null)
+                _goal.Open(false);
+        }
+
+        /// <summary>Goal button visibility + the once-per-day auto show. Called from Show().</summary>
+        void RefreshGoal()
+        {
+            if (_goal == null)
+                return;
+            bool completed = KebammGoalTracking.HasCompletedLevel1();
+            if (_goalButton != null)
+                _goalButton.gameObject.SetActive(completed);
+            if (_goal.IsOpen)
+            {
+                if (!completed)
+                    _goal.CloseImmediate(); // save deleted / progress reset while it was open
+                return;
+            }
+            if (_goalSessionChecked)
+                return;
+            _goalSessionChecked = true;
+            if (completed && !KebammGoalTracking.ShownToday)
+                _goal.Open(true);
         }
 
         void RefreshPlayerPanel()
@@ -486,8 +622,8 @@ namespace Kebamm
             _shownStars = stars;
             _shownCoins = coins;
             _playerName.text = name;
-            _playerStars.text = "Stars: " + stars;
-            _playerCoins.text = "Coins: " + coins;
+            _playerStars.text = stars.ToString();
+            _playerCoins.text = coins.ToString();
         }
 
         // PLACEHOLDER Settings popup (Notion: Main Menu > Setting Screen Popup): Sound, Music, Delete Save,
@@ -629,6 +765,7 @@ namespace Kebamm
             _shownStars = -1;
             RefreshPlayerPanel();
             RefreshLevel();
+            RefreshGoal();
             StartIdleTweens();
             ShowUpdatePrompt();
         }
@@ -636,6 +773,8 @@ namespace Kebamm
         public void Hide()
         {
             KillTweens();
+            if (_goal != null)
+                _goal.CloseImmediate();
             if (_updateRoot != null)
                 _updateRoot.SetActive(false);
             if (_settingsRoot != null)
@@ -847,7 +986,7 @@ namespace Kebamm
             return loaded;
         }
 
-        static TMP_FontAsset GetLilitaFont()
+        internal static TMP_FontAsset GetLilitaFont()
         {
             if (_lilitaFont != null)
                 return _lilitaFont;
