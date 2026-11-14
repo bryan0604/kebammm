@@ -71,8 +71,23 @@ MonoBehaviour:
   titleShineAlpha: 0.7
   titleShineThickness: 60
   dropBurstPrefab: {fileID: 1429954232896169633, guid: 83036083a4ebcd34f98131bd3cf6f4d2, type: 3}
-  dropBurstScale: 0.4
+  dropBurstScale: 0.25
   dropBurstPoolSize: 6
+  fireflyPrefab: {fileID: 4364354964670000192, guid: 3801a320e9ae1bf44a14efa194c86c3f, type: 3}
+  fireflyCount: 2
+  fireflyBandHeight: 1.5
+  fireflyRate: 3
+  fireflySizeScale: 1
+  comboDotCountMin: 4
+  comboDotCountMax: 8
+  comboDotSize: 44
+  comboDotBurstRadius: 90
+  comboDotBurstTime: 0.18
+  comboDotFlightTime: 0.45
+  comboDotStagger: 0.04
+  comboDotCurve: 120
+  comboDotShadowAlpha: 0.45
+  comboDotShadowOffset: 8
   comboGlowDuration: 0.45
   comboGlowSize: 28
   comboGlowMaxCombo: 6

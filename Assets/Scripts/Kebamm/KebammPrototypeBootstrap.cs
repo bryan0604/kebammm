@@ -424,6 +424,7 @@ namespace Kebamm
             // Background art draws its own grass; keep the collider, hide the flat ground strip.
             if (BuildBackground(cam, (MonsterY - 1f) + GroundThickness * 0.5f))
                 gSr.enabled = false;
+            KebammFireflies.Build(_worldRoot, _gameManager, (MonsterY - 1f) + GroundThickness * 0.5f, GroundWidth);
 
             SpawnMonsters();
             _trebuchet = KebammTrebuchet.Create(this, _worldRoot);

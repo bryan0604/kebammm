@@ -19,6 +19,9 @@ namespace Kebamm
         /// <summary>Bomb level rule: normal drops since the last rule bomb (level bombEveryMoves). Combo and debug bombs do not touch it.</summary>
         public static int MovesSinceRuleBomb { get; private set; }
 
+        /// <summary>World position of the latest merge that paid combo points (combo dots fly from here).</summary>
+        public static Vector3 LastMergePosition { get; private set; }
+
         public static event Action Changed;
         /// <summary>Raised with the number of bombs earned when the bar fills (once per merge, even for several fills).</summary>
         public static event Action<int> BarFilled;
@@ -71,6 +74,7 @@ namespace Kebamm
             if (KebammScoreHud.Instance != null && KebammScoreHud.Instance.IsEndVisible)
                 return;
             KebammComboConfig cfg = Config;
+            LastMergePosition = position;
             ComboCount++;
             int basePts = cfg.PointsFor(ComboCount);
             float mod = progressModifier > 0f ? progressModifier : 1f;

@@ -156,7 +156,7 @@ namespace Kebamm
         [Range(0f, 1f)] public float titleShineAlpha = 0.7f;
         [Tooltip("Width of the title light strip in UI pixels (Notion VFX title_shine_thickness). <= 0 = 60.")]
         [Min(0f)] public float titleShineThickness = 60f;
-        [Header("Drop Burst VFX (local tuning, not in Notion until the style is approved)")]
+        [Header("Drop Burst VFX (Notion VFX)")]
         [Tooltip("Burst played where a dropped ball first touches with its bottom side (local asset reference, not in Notion). Empty = no burst.")]
         public GameObject dropBurstPrefab;
         [Tooltip("Burst size = this x the ball's diameter. <= 0 = 1.")]
@@ -164,6 +164,38 @@ namespace Kebamm
         [Tooltip("How many bursts are pre-made and reused (most that can play at once). <= 0 = 6.")]
         [Min(0)] public int dropBurstPoolSize = 6;
 
+        [Header("Firefly VFX (Notion VFX)")]
+        [Tooltip("Ambient glow prefab placed along the monster platform only (local asset reference). Empty = no fireflies.")]
+        public GameObject fireflyPrefab;
+        [Tooltip("How many whole prefabs sit side by side along the platform, each over its own slice (no stacking). 0 = off.")]
+        [Min(0)] public int fireflyCount = 2;
+        [Tooltip("Height in world units above the platform top where the fireflies drift. <= 0 = 1.5.")]
+        [Min(0f)] public float fireflyBandHeight = 1.5f;
+        [Tooltip("Dots spawned per second by each prefab (pack default 50). <= 0 = 3.")]
+        [Min(0f)] public float fireflyRate = 3f;
+        [Tooltip("Multiplier on the pack's dot size. <= 0 = 1.")]
+        [Min(0f)] public float fireflySizeScale = 1f;
+        [Header("Combo Dots VFX (local tuning, not in Notion until the style is approved)")]
+        [Tooltip("Glowing dots flying from a merge to the combo bar at combo 1. Both 0 = off (bar fills instantly as before).")]
+        [Min(0)] public int comboDotCountMin = 4;
+        [Tooltip("Dots at combo_glow_max_combo and above.")]
+        [Min(0)] public int comboDotCountMax = 8;
+        [Tooltip("Dot size in UI pixels. <= 0 = 26.")]
+        [Min(0f)] public float comboDotSize = 26f;
+        [Tooltip("How far (UI px) the dots burst out from the merge before flying.")]
+        [Min(0f)] public float comboDotBurstRadius = 90f;
+        [Tooltip("Seconds of the burst-out. <= 0 = 0.18.")]
+        [Min(0f)] public float comboDotBurstTime = 0.18f;
+        [Tooltip("Seconds each dot takes to curve into the bar. <= 0 = 0.45.")]
+        [Min(0f)] public float comboDotFlightTime = 0.45f;
+        [Tooltip("Delay in seconds between each dot leaving (0 = all together).")]
+        [Min(0f)] public float comboDotStagger = 0.04f;
+        [Tooltip("How much the flight path bends sideways (UI px). 0 = straight line.")]
+        [Min(0f)] public float comboDotCurve = 120f;
+        [Tooltip("Drop shadow darkness under each dot, 0-1 (0 = no shadow).")]
+        [Range(0f, 1f)] public float comboDotShadowAlpha = 0.45f;
+        [Tooltip("Drop shadow offset down-right in UI px (how 'lifted' the dot looks).")]
+        [Min(0f)] public float comboDotShadowOffset = 8f;
         [Header("Combo Box Glow (Notion VFX)")]
         [Tooltip("Seconds the combo glow takes to fade out after each combo point gain. <= 0 = 0.45.")]
         [Min(0f)] public float comboGlowDuration = 0.45f;
@@ -255,6 +287,20 @@ namespace Kebamm
         public int DestroyedFirePointsMax => Mathf.Max(0, Mathf.Max(destroyedFirePointsMin, destroyedFirePointsMax));
         public float DropBurstScale => dropBurstScale > 0f ? dropBurstScale : 1f;
         public int DropBurstPoolSize => dropBurstPoolSize > 0 ? dropBurstPoolSize : 6;
+        public int FireflyCount => Mathf.Max(0, fireflyCount);
+        public float FireflyBandHeight => fireflyBandHeight > 0f ? fireflyBandHeight : 1.5f;
+        public float FireflyRate => fireflyRate > 0f ? fireflyRate : 3f;
+        public float FireflySizeScale => fireflySizeScale > 0f ? fireflySizeScale : 1f;
+        public float ComboDotSize => comboDotSize > 0f ? comboDotSize : 26f;
+        public float ComboDotBurstTime => comboDotBurstTime > 0f ? comboDotBurstTime : 0.18f;
+        public float ComboDotFlightTime => comboDotFlightTime > 0f ? comboDotFlightTime : 0.45f;
+        /// <summary>Dots for this combo count: min at combo 1 up to max at combo_glow_max_combo.</summary>
+        public int ComboDotCountFor(int combo)
+        {
+            int max = ComboGlowMaxCombo;
+            float s = max > 1 ? Mathf.Clamp01((combo - 1f) / (max - 1f)) : 1f;
+            return Mathf.Max(0, Mathf.RoundToInt(Mathf.Lerp(comboDotCountMin, comboDotCountMax, s)));
+        }
         public float DestroyedFireScale => destroyedFireScale > 0f ? destroyedFireScale : 0.35f;
         public float Star1Threshold => Mathf.Clamp01(star1Threshold);
         public float Star2Threshold => Mathf.Max(Star1Threshold, Mathf.Clamp01(star2Threshold));

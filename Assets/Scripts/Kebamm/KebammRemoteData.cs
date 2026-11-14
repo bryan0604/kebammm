@@ -409,6 +409,12 @@ namespace Kebamm
             SetFloat(row, "combo_glow_pop_max", table, "comboGlowPopMax", ref g.comboGlowPopMax);
             SetFloat(row, "combo_bounce_min", table, "comboBounceMin", ref g.comboBounceMin);
             SetFloat(row, "combo_bounce_max", table, "comboBounceMax", ref g.comboBounceMax);
+            SetFloat(row, "drop_burst_scale", table, "dropBurstScale", ref g.dropBurstScale);
+            SetInt(row, "drop_burst_pool_size", table, "dropBurstPoolSize", ref g.dropBurstPoolSize);
+            SetInt(row, "firefly_count", table, "fireflyCount", ref g.fireflyCount);
+            SetFloat(row, "firefly_band_height", table, "fireflyBandHeight", ref g.fireflyBandHeight);
+            SetFloat(row, "firefly_rate", table, "fireflyRate", ref g.fireflyRate);
+            SetFloat(row, "firefly_size_scale", table, "fireflySizeScale", ref g.fireflySizeScale);
             SetInt(row, "destroyed_fire_points_min", table, "destroyedFirePointsMin", ref g.destroyedFirePointsMin);
             SetInt(row, "destroyed_fire_points_max", table, "destroyedFirePointsMax", ref g.destroyedFirePointsMax);
             SetInt(row, "explosion_bit_max_on_screen", table, "explosionBitMaxOnScreen", ref g.explosionBitMaxOnScreen);

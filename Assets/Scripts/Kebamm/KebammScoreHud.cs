@@ -182,17 +182,78 @@ namespace Kebamm
             _lastBarPoints = bar;
             _lastTotal = total;
 
+            if (gain <= 0 || !isActiveAndEnabled)
+            {
+                // Reset / new attempt: drop dots still flying (their fill would be stale) and snap.
+                _comboGen++;
+                _deferPulse = false;
+                if (_comboDots != null)
+                    _comboDots.Clear();
+                if (_fillSeq != null && _fillSeq.IsActive())
+                    _fillSeq.Kill();
+                _fillSeq = null;
+                SetFill(target, cap);
+                return;
+            }
+
+            int combo = KebammCombo.ComboCount;
+            int gen = _comboGen;
+            if (SpawnComboDots(combo, () =>
+                {
+                    if (gen != _comboGen || _comboFill == null)
+                        return;
+                    PlayComboGain(combo, overflow, target, cap);
+                    if (overflow)
+                        PulseComboBarNow();
+                }))
+            {
+                _deferPulse = overflow; // BarFilled fires right after this; the pulse waits for the dots
+                return;
+            }
+            PlayComboGain(combo, overflow, target, cap);
+        }
+
+        // ---- Combo dots (VFX Fine Tuning; local tuning in GameManager.asset until the style is approved) ----
+        KebammComboDots _comboDots;
+        int _comboGen;
+        bool _deferPulse;
+
+        /// <summary>Flies glowing dots from the latest merge to the combo bar. False (no dots) = fill right away.</summary>
+        bool SpawnComboDots(int combo, System.Action onFirstArrive)
+        {
+            if (_comboDots == null || _comboBar == null)
+                return false;
+            KebammGameManagerData gm = KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
+            Camera cam = Camera.main;
+            if (gm == null || cam == null)
+                return false;
+            int count = gm.ComboDotCountFor(combo);
+            if (count <= 0)
+                return false;
+            Vector2 screenFrom = cam.WorldToScreenPoint(KebammCombo.LastMergePosition);
+            Vector2 screenTo = RectTransformUtility.WorldToScreenPoint(null, _comboBar.position);
+            RectTransform root = _comboDots.Root;
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screenFrom, null, out Vector2 from)
+                || !RectTransformUtility.ScreenPointToLocalPointInRectangle(root, screenTo, null, out Vector2 to))
+                return false;
+            Color c = _comboFillImage != null ? _comboFillImage.color : new Color(1f, 0.78f, 0.15f, 1f);
+            return _comboDots.Fly(from, to, _comboBarWidth * 0.3f, count, c, gm, onFirstArrive);
+        }
+
+        /// <summary>The bar's reaction to a combo gain: glow + bounce and the animated fill (when the dots hit, or at once).</summary>
+        void PlayComboGain(int combo, bool overflow, float target, int cap)
+        {
+            KebammComboConfig cfg = KebammCombo.Config;
             if (_fillSeq != null && _fillSeq.IsActive())
                 _fillSeq.Kill(); // rapid merges: never stack tweens, continue from the shown value
             _fillSeq = null;
 
-            if (gain > 0 && isActiveAndEnabled)
-                GlowComboBar(KebammCombo.ComboCount, overflow);
+            GlowComboBar(combo, overflow);
 
             float dur = Mathf.Max(0f, cfg.barFillDuration);
-            if (gain <= 0 || dur <= 0f || !isActiveAndEnabled)
+            if (dur <= 0f || !isActiveAndEnabled)
             {
-                SetFill(target, cap); // reset / new attempt / animation off: snap
+                SetFill(target, cap); // animation off: snap
                 return;
             }
 
@@ -309,6 +370,16 @@ namespace Kebamm
 
         void PulseComboBar(int fills)
         {
+            if (_deferPulse)
+            {
+                _deferPulse = false; // played when the combo dots hit the bar
+                return;
+            }
+            PulseComboBarNow();
+        }
+
+        void PulseComboBarNow()
+        {
             if (_comboBar == null)
                 return;
             KebammComboConfig cfg = KebammCombo.Config;
@@ -344,6 +415,7 @@ namespace Kebamm
             _levelValue = CreateLabel(canvasGo.transform, "LevelHud", "Level 1", 34f,
                 new Vector2(0.5f, 1f), new Vector2(0f, -140f), new Vector2(960f, 56f));
             BuildComboBar(canvasGo.transform);
+            _comboDots = KebammComboDots.Create(canvasGo.transform); // above the bar, below the end screen
 
             _endRoot = new GameObject("EndScreen");
             _endRoot.transform.SetParent(canvasGo.transform, false);
