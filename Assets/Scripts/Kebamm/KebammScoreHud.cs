@@ -53,6 +53,7 @@ namespace Kebamm
         Sequence _endSequence;
         TextMeshProUGUI _endMergeValue;
         TextMeshProUGUI _endMonsterValue;
+        TextMeshProUGUI _endComboValue;
         TextMeshProUGUI _endFinalValue;
         TextMeshProUGUI _endCoinsLabel;
         TextMeshProUGUI _endCoinsValue;
@@ -445,18 +446,23 @@ namespace Kebamm
             _stars[0] = CreateStar(_endRoot.transform, "Star1", new Vector2(-160f, 470f), 110f);
             _stars[1] = CreateStar(_endRoot.transform, "Star2", new Vector2(0f, 485f), 130f);
             _stars[2] = CreateStar(_endRoot.transform, "Star3", new Vector2(160f, 470f), 110f);
+            // Merge, Monster and Combo lines, then Final (tightened 16 Nov 2026 to fit the Combo Score line).
             CreateLabel(_endRoot.transform, "EndMergeLabel", "Merge Score", 36f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 360f), new Vector2(900f, 56f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 380f), new Vector2(900f, 56f));
             _endMergeValue = CreateLabel(_endRoot.transform, "EndMergeValue", "0", 48f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 290f), new Vector2(900f, 72f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 322f), new Vector2(900f, 72f));
             CreateLabel(_endRoot.transform, "EndMonsterLabel", "Monster Score", 36f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 180f), new Vector2(900f, 56f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 265f), new Vector2(900f, 56f));
             _endMonsterValue = CreateLabel(_endRoot.transform, "EndMonsterValue", "0", 48f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, 110f), new Vector2(900f, 72f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 207f), new Vector2(900f, 72f));
+            CreateLabel(_endRoot.transform, "EndComboLabel", "Combo Score", 36f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 150f), new Vector2(900f, 56f));
+            _endComboValue = CreateLabel(_endRoot.transform, "EndComboValue", "0", 48f,
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 92f), new Vector2(900f, 72f));
             CreateLabel(_endRoot.transform, "EndFinalLabel", "Final Score", 36f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(900f, 56f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, 25f), new Vector2(900f, 56f));
             _endFinalValue = CreateLabel(_endRoot.transform, "EndFinalValue", "0", 96f,
-                new Vector2(0.5f, 0.5f), new Vector2(0f, -120f), new Vector2(900f, 130f));
+                new Vector2(0.5f, 0.5f), new Vector2(0f, -80f), new Vector2(900f, 130f));
             // Rewards Earn: Art Document coin icon and coins earned this level, counting up from 0.
             _endCoinsLabel = CreateLabel(_endRoot.transform, "EndCoinsLabel", "Coins Earned", 36f,
                 new Vector2(0.5f, 0.5f), new Vector2(0f, -225f), new Vector2(900f, 56f));
@@ -508,6 +514,8 @@ namespace Kebamm
                 _endMergeValue.text = KebammScore.MergeScore.ToString();
             if (_endMonsterValue != null)
                 _endMonsterValue.text = KebammScore.MonsterScore.ToString();
+            if (_endComboValue != null)
+                _endComboValue.text = KebammScore.ComboScore.ToString();
             if (_endFinalValue != null)
                 _endFinalValue.text = KebammScore.FinalScore.ToString();
         }
@@ -650,11 +658,15 @@ namespace Kebamm
             int mKilled = KebammScore.MonstersDestroyed, mTotal = boot != null ? boot.MonstersInLevel : 0;
             int oKilled = boot != null ? boot.ObstaclesDestroyed : 0, oTotal = boot != null ? boot.ObstaclesInLevel : 0;
             int tKilled = boot != null ? boot.TrebuchetsDestroyed : 0, tTotal = boot != null ? boot.TrebuchetsInLevel : 0;
-            int m = KebammGameManagerData.CategoryStar(mKilled, mTotal, gm.StarMonsterThreshold);
-            int o = KebammGameManagerData.CategoryStar(oKilled, oTotal, gm.StarObstacleThreshold);
-            int tr = KebammGameManagerData.CategoryStar(tKilled, tTotal, gm.StarTrebuchetThreshold);
+            var lv = boot != null ? boot.CurrentLevel : null;
+            float mThr = lv != null && lv.starMonsterThreshold >= 0f ? Mathf.Clamp01(lv.starMonsterThreshold) : gm.StarMonsterThreshold;
+            float oThr = lv != null && lv.starObstacleThreshold >= 0f ? Mathf.Clamp01(lv.starObstacleThreshold) : gm.StarObstacleThreshold;
+            float tThr = lv != null && lv.starTrebuchetThreshold >= 0f ? Mathf.Clamp01(lv.starTrebuchetThreshold) : gm.StarTrebuchetThreshold;
+            int m = KebammGameManagerData.CategoryStar(mKilled, mTotal, mThr);
+            int o = KebammGameManagerData.CategoryStar(oKilled, oTotal, oThr);
+            int tr = KebammGameManagerData.CategoryStar(tKilled, tTotal, tThr);
             int earned = m + o + tr;
-            Debug.Log($"[Kebamm] Stars earned: {earned} (monsters {mKilled}/{mTotal} -> {m}{(mTotal <= 0 ? " free" : "")}, obstacles {oKilled}/{oTotal} -> {o}{(oTotal <= 0 ? " free" : "")}, trebuchet {tKilled}/{tTotal} -> {tr}{(tTotal <= 0 ? " free" : "")}; thresholds {gm.StarMonsterThreshold * 100f:0.#}% / {gm.StarObstacleThreshold * 100f:0.#}% / {gm.StarTrebuchetThreshold * 100f:0.#}%)");
+            Debug.Log($"[Kebamm] Stars earned: {earned} (monsters {mKilled}/{mTotal} -> {m}{(mTotal <= 0 ? " free" : "")}, obstacles {oKilled}/{oTotal} -> {o}{(oTotal <= 0 ? " free" : "")}, trebuchet {tKilled}/{tTotal} -> {tr}{(tTotal <= 0 ? " free" : "")}; thresholds {mThr * 100f:0.#}% / {oThr * 100f:0.#}% / {tThr * 100f:0.#}%)");
             return earned;
         }
 
@@ -705,6 +717,7 @@ namespace Kebamm
                     SetScoreNumbersVisible(true);
                     CountEndNumber(_endMergeValue, KebammScore.MergeScore);
                     CountEndNumber(_endMonsterValue, KebammScore.MonsterScore);
+                    CountEndNumber(_endComboValue, KebammScore.ComboScore);
                 })
                 .AppendInterval(config.finalScoreDelay)
                 .AppendCallback(() =>
@@ -801,6 +814,8 @@ namespace Kebamm
                 _endMergeValue.gameObject.SetActive(visible);
             if (_endMonsterValue != null)
                 _endMonsterValue.gameObject.SetActive(visible);
+            if (_endComboValue != null)
+                _endComboValue.gameObject.SetActive(visible);
         }
 
         // _stars[] are the filled Star Resource overlays. The empty base under each always stays visible;

@@ -16,6 +16,10 @@ namespace Kebamm
         [Tooltip("Points paid by the Nth merge of one drop. Merges past the last entry pay the last entry (combo 5 = max).")]
         public List<int> comboPoints = new List<int> { 20, 40, 60, 80, 100 };
 
+        [Header("Combo Score (Notion Combo Points combo_score; index 0 = combo 1)")]
+        [Tooltip("Score paid into the Combo Score line by the Nth merge of one drop. Merges past the last entry pay the last entry. Not changed by combo_progress_modifier.")]
+        public List<int> comboScore = new List<int> { 200, 500, 2500, 8750, 15560 };
+
         [Header("Combo Text")]
         [Tooltip("Lowest combo count that shows the floating 'Combo N!' text (2 = no popup for combo 1). Points and bar are unaffected.")]
         public int minComboToShowText = 2;
@@ -91,6 +95,13 @@ namespace Kebamm
             if (comboPoints == null || comboPoints.Count == 0 || comboCount <= 0)
                 return 0;
             return Mathf.Max(0, comboPoints[Mathf.Min(comboCount, comboPoints.Count) - 1]);
+        }
+
+        public int ScoreFor(int comboCount)
+        {
+            if (comboScore == null || comboScore.Count == 0 || comboCount <= 0)
+                return 0;
+            return Mathf.Max(0, comboScore[Mathf.Min(comboCount, comboScore.Count) - 1]);
         }
 
         public string TextFor(int comboCount)

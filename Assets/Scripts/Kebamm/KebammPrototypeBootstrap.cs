@@ -903,7 +903,7 @@ namespace Kebamm
             return level != null ? level.RollDropPlayTier() : 0;
         }
 
-        KebammLevel CurrentLevel =>
+        public KebammLevel CurrentLevel =>
             _levelIndex >= 0 && _levelIndex < _activeLevels.Count ? _activeLevels[_levelIndex] : null;
 
         /// <summary>Current level's bomb rule (Level Data bomb_every_moves); 0 = off.</summary>

@@ -18,6 +18,12 @@ MonoBehaviour:
   - 60
   - 80
   - 100
+  comboScore:
+  - 200
+  - 500
+  - 2500
+  - 8750
+  - 15560
   minComboToShowText: 2
   comboTextFormat: 'Combo {combo_count}!'
   comboTextFontSize: 36

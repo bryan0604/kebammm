@@ -64,7 +64,7 @@ namespace Kebamm
         [Tooltip("Seconds of rest between title pulses (Notion title_pulse_interval). 0 = continuous.")]
         public float titlePulseInterval = 5f;
 
-        [Header("Game Result - Stars per category (local tuning, not in Notion yet)")]
+        [Header("Game Result - Stars per category (defaults; each level can override in Notion Levels star_*_threshold)")]
         [Tooltip("Monster star: fraction of the level's monsters destroyed for 1 star. 0.5 = 50%. No monsters in the level = free star.")]
         [Range(0f, 1f)] public float starMonsterThreshold = 0.5f;
         [Tooltip("Obstacle star: fraction of the level's obstacles destroyed for 1 star. No obstacles in the level = free star.")]
@@ -95,13 +95,15 @@ namespace Kebamm
         [Tooltip("Magic Bomb diameter in world units: visual and collider, held and dropped (Notion magic_bomb_size). <= 0 = combo_config bombDiameter (0.5).")]
         [FormerlySerializedAs("bombSize")]
         public float magicBombSize = 0.5f;
+        [Tooltip("Flat score bonus each time a Magic Bomb explodes, added to the Monster score line (Notion magic_bomb_explode_score). 0 = no points.")]
+        public int magicBombExplodeScore = 500;
         [Header("Jar Panel (local only, not in Notion)")]
         [Tooltip("Colour + alpha of the see-through panel filling the jar play area, drawn above the level background and behind balls, bombs, pillars and base.")]
         public Color jarPanelColor = new Color(1f, 1f, 1f, 0.1f);
         [Tooltip("Extra size around the jar inner area (world units, each side). 0 = meets the pillars' and base's visible edges (tucked under them). Negative shrinks.")]
         public float jarPanelPadding = 0f;
         [Header("Drop Indication (local only, not in Notion)")]
-        [Tooltip("White dotted aim guide opacity in percent (0 hides it). Local only; not exported to Notion or the Gist.")]
+        [Tooltip("Black dotted aim guide opacity in percent (0 hides it). Local only; not exported to Notion or the Gist.")]
         [Range(0f, 100f)] public float dropIndicationOpacity = 30f;
         [Tooltip("Dotted aim guide thickness in world units. Local only; 0 hides it. Applied live.")]
         [Min(0f)] public float dropIndicationThickness = 0.025f;
@@ -295,6 +297,7 @@ namespace Kebamm
         public float MagicBombExplodeRange => Mathf.Max(0f, magicBombExplodeRange);
         public int MagicBombExplodeDamage => Mathf.Max(0, magicBombExplodeDamage);
         public int MagicBombExplodeStrength => Mathf.Max(0, magicBombExplodeStrength);
+        public int MagicBombExplodeScore => Mathf.Max(0, magicBombExplodeScore);
         /// <summary>magicBombSize, or 0 when unset (caller falls back to combo_config bombDiameter).</summary>
         public float MagicBombSize => magicBombSize > 0f ? magicBombSize : 0f;
         public float MaxCapLineCloseDistance => maxCapLineCloseDistance > 0f ? maxCapLineCloseDistance : 1f;

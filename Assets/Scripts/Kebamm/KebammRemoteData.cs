@@ -283,6 +283,9 @@ namespace Kebamm
                 l.prepopulateObstaclePositionRangeX = ox;
             }
             SetInt(row, "bomb_every_moves", n, "bombEveryMoves", ref l.bombEveryMoves); // missing = asset value (0 = off)
+            SetFloat(row, "star_monster_threshold", n, "starMonsterThreshold", ref l.starMonsterThreshold); // missing = Game Manager default
+            SetFloat(row, "star_obstacle_threshold", n, "starObstacleThreshold", ref l.starObstacleThreshold);
+            SetFloat(row, "star_trebuchet_threshold", n, "starTrebuchetThreshold", ref l.starTrebuchetThreshold);
             SetFloat(row, "combo_progress_modifier", n, "comboProgressModifier", ref l.comboProgressModifier); // missing = asset value (default 1); non-positive treated as 1 at runtime
             SetString(row, "type_level", n, "typeLevel", ref l.typeLevel); // label only
             // Trebuchet (Y/X/Z/W/T). Missing/blank = asset value (defaults 15/5/1/5/2); runtime treats invalid values as defaults.
@@ -365,6 +368,7 @@ namespace Kebamm
             SetInt(row, "magic_bomb_explode_strength", "GameManager", "magicBombExplodeStrength", ref g.magicBombExplodeStrength);
             SetFloat(row, "bomb_size", "GameManager", "magicBombSize", ref g.magicBombSize);
             SetFloat(row, "magic_bomb_size", "GameManager", "magicBombSize", ref g.magicBombSize);
+            SetInt(row, "magic_bomb_explode_score", "GameManager", "magicBombExplodeScore", ref g.magicBombExplodeScore); // missing = asset value
             SetFloat(row, "max_cap_line_close_distance", "GameManager", "maxCapLineCloseDistance", ref g.maxCapLineCloseDistance);
             SetFloat(row, "max_cap_line_blink_half_period", "GameManager", "maxCapLineBlinkHalfPeriod", ref g.maxCapLineBlinkHalfPeriod);
             SetFloat(row, "max_cap_hit_blink_speed_multiplier", "GameManager", "maxCapHitBlinkSpeedMultiplier", ref g.maxCapHitBlinkSpeedMultiplier);
@@ -438,7 +442,7 @@ namespace Kebamm
             SetInt(row, "explosion_bit_max_on_screen", table, "explosionBitMaxOnScreen", ref g.explosionBitMaxOnScreen);
         }
 
-        /// <summary>Combo Points override: table comboPointsData, rows combo_N { combo_count, combo_points } (Notion Combo Points).</summary>
+        /// <summary>Combo Points override: table comboPointsData, rows combo_N { combo_count, combo_points, combo_score } (Notion Combo Points).</summary>
         public static KebammComboConfig ForComboConfig(KebammComboConfig asset)
         {
             if (asset == null || _applied == null || !_applied.TryGetValue("comboPointsData", out object t) || !(t is Dictionary<string, object> rows))
@@ -446,6 +450,7 @@ namespace Kebamm
             if (_copies.TryGetValue(asset, out var done) && done != null) return (KebammComboConfig)done;
             var c = CopyOf(asset);
             c.comboPoints = new List<int>(c.comboPoints ?? new List<int>());
+            c.comboScore = new List<int>(c.comboScore ?? new List<int>());
             foreach (var kv in rows)
             {
                 if (!(kv.Value is Dictionary<string, object> row)) continue;
@@ -456,6 +461,10 @@ namespace Kebamm
                 int pts = c.comboPoints[index];
                 SetInt(row, "combo_points", "combo_config", "comboPoints[" + index + "]", ref pts);
                 c.comboPoints[index] = pts;
+                while (c.comboScore.Count <= index) c.comboScore.Add(c.comboScore.Count > 0 ? c.comboScore[c.comboScore.Count - 1] : 0);
+                int score = c.comboScore[index];
+                SetInt(row, "combo_score", "combo_config", "comboScore[" + index + "]", ref score); // missing = asset value
+                c.comboScore[index] = score;
             }
             return c;
         }

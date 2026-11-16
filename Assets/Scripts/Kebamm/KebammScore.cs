@@ -9,7 +9,9 @@ namespace Kebamm
 
         public static int MergeScore { get; private set; }
         public static int MonsterScore { get; private set; }
-        public static int FinalScore => MergeScore + MonsterScore;
+        /// <summary>Combo Score line: each merge pays combo_config comboScore for its combo count.</summary>
+        public static int ComboScore { get; private set; }
+        public static int FinalScore => MergeScore + MonsterScore + ComboScore;
         public static int MonstersDestroyed { get; private set; }
         /// <summary>Seconds of play since the last reset (main menu, pause and score screen excluded). Analytics duration_sec.</summary>
         public static float PlaySeconds { get; private set; }
@@ -36,6 +38,7 @@ namespace Kebamm
             _locked = false;
             MergeScore = 0;
             MonsterScore = 0;
+            ComboScore = 0;
             MonstersDestroyed = 0;
             PlaySeconds = 0f;
             Array.Clear(_ballsByTier, 0, _ballsByTier.Length);
@@ -64,6 +67,16 @@ namespace Kebamm
             Changed?.Invoke();
         }
 
+        public static void AddCombo(int comboCount, int points)
+        {
+            if (_locked || points <= 0)
+                return;
+
+            ComboScore += points;
+            Debug.Log($"[Kebamm] Combo {comboCount} score +{points} total={ComboScore}");
+            Changed?.Invoke();
+        }
+
         public static void AddHit(int points)
         {
             if (_locked)
@@ -82,6 +95,17 @@ namespace Kebamm
 
             MonsterScore += points;
             Debug.Log($"[Kebamm] Obstacle destroy score +{points} total={MonsterScore}");
+            Changed?.Invoke();
+        }
+
+        /// <summary>Magic Bomb exploded: flat bonus into the Monster score line; not a monster destroyed (stars).</summary>
+        public static void AddMagicBomb(int points)
+        {
+            if (_locked || points <= 0)
+                return;
+
+            MonsterScore += points;
+            Debug.Log($"[Kebamm] Magic Bomb explode score +{points} total={MonsterScore}");
             Changed?.Invoke();
         }
 

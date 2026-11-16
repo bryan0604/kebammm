@@ -47,6 +47,14 @@ namespace Kebamm
         /// <summary>comboProgressModifier, or 1 when unset / not positive (same pattern as MonsterHpModifier).</summary>
         public float ComboProgressModifier => comboProgressModifier > 0f ? comboProgressModifier : 1f;
 
+        [Header("Stars - per category goal (Notion Levels star_*_threshold)")]
+        [Tooltip("Monster star: fraction of this level's monsters destroyed for 1 star (0.5 = 50%). Negative / blank = Game Manager default.")]
+        public float starMonsterThreshold = -1f;
+        [Tooltip("Obstacle star: fraction of this level's obstacles destroyed for 1 star. Negative / blank = Game Manager default.")]
+        public float starObstacleThreshold = -1f;
+        [Tooltip("Trebuchet star: fraction of trebuchets destroyed for 1 star. Negative / blank = Game Manager default.")]
+        public float starTrebuchetThreshold = -1f;
+
         // Trebuchet (GDD [Level] Monster Group Design). Design letters: Y, X, Z, W, T.
         public const int DefaultTrebuchetStartDrops = 15;  // Y
         public const int DefaultTrebuchetStageDrops = 5;   // X

@@ -8,7 +8,8 @@ namespace Kebamm
     /// Magic Bomb behaviour on a live bomb ball (KebammBall.IsBomb). The timer starts on the first touch with
     /// anything in the jar (wall, base/floor or a ball); after bomb_touch_delay it explodes: every ball within
     /// bomb_explode_range takes bomb_explode_damage (ball health - damage; 0 or less = destroyed) and survivors are
-    /// pushed away with bomb_explode_strength (impulse). Balls only: no monsters, obstacles, score or merges.
+    /// pushed away with bomb_explode_strength (impulse). Balls and rocks only: no monsters, obstacles or merges.
+    /// Each explosion adds the flat magic_bomb_explode_score bonus to the Monster score line.
     /// </summary>
     public class KebammMagicBomb : MonoBehaviour
     {
@@ -185,6 +186,7 @@ namespace Kebamm
             }
             Debug.Log($"[Kebamm] Magic Bomb exploded at ({centre.x:0.00}, {centre.y:0.00}) range={range} damage={damage} strength={strength}: balls hit={Hits.Count} destroyed={destroyed} pushed={pushed}");
             Hits.Clear();
+            KebammScore.AddMagicBomb(gm != null ? gm.MagicBombExplodeScore : 500);
             KebammMagicBombFx.Play(centre, range);
             FlashOverlayAndRelease();
             Destroy(gameObject);

@@ -42,9 +42,10 @@ MonoBehaviour:
   magicBombExplodeDamage: 10
   magicBombExplodeStrength: 3
   magicBombSize: 0.5
+  magicBombExplodeScore: 500
   jarPanelColor: {r: 1, g: 1, b: 1, a: 0.1}
   jarPanelPadding: 0
-  dropIndicationOpacity: 30
+  dropIndicationOpacity: 60
   dropIndicationThickness: 0.025
   maxCapLineCloseDistance: 1
   maxCapLineBlinkHalfPeriod: 0.25

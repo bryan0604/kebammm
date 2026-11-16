@@ -80,6 +80,7 @@ namespace Kebamm
             float mod = progressModifier > 0f ? progressModifier : 1f;
             int paid = Mathf.Max(0, Mathf.RoundToInt(basePts * mod)); // e.g. 20 x 1.5 = 30 into the bar
             TotalComboPoints += paid;
+            KebammScore.AddCombo(ComboCount, cfg.ScoreFor(ComboCount)); // Combo Score line (not scaled by the bar modifier)
             BarPoints += paid;
             int fills = 0;
             int cap = cfg.BarCapacity;

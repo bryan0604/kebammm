@@ -1,3 +1,4 @@
+using System.Collections;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -690,7 +691,41 @@ namespace Kebamm
                 return;
             _goalSessionChecked = true;
             if (completed && !KebammGoalTracking.ShownToday)
+            {
+                if (_goalAutoOpen != null)
+                    StopCoroutine(_goalAutoOpen);
+                _goalAutoOpen = StartCoroutine(AutoOpenGoalWhenLoaded());
+            }
+        }
+
+        // Goal Tracking auto show waits for app loading to finish. While the app is still loading, frames are long
+        // (e.g. 1-2 s). The popup runs on unscaled time, so the launch would finish inside those frames before the
+        // player sees anything. Wait for a few smooth frames in a row, then a short beat, then open.
+        const int GoalSmoothFramesNeeded = 5;
+        const float GoalSmoothFrameMax = 1f / 20f;   // a frame slower than this counts as still loading
+        const float GoalSettleDelay = 0.35f;         // beat after loading so the menu is on screen first
+        const float GoalMaxWait = 6f;                // safety: open anyway after this long
+        Coroutine _goalAutoOpen;
+
+        IEnumerator AutoOpenGoalWhenLoaded()
+        {
+            float waited = 0f;
+            int smooth = 0;
+            while (smooth < GoalSmoothFramesNeeded && waited < GoalMaxWait)
+            {
+                yield return null;
+                float dt = Time.unscaledDeltaTime;
+                waited += Mathf.Min(dt, 0.5f);
+                smooth = dt <= GoalSmoothFrameMax ? smooth + 1 : 0;
+            }
+            yield return new WaitForSecondsRealtime(GoalSettleDelay);
+            _goalAutoOpen = null;
+            bool menuUp = _root != null && _root.activeInHierarchy;
+            if (_goal != null && menuUp && !_goal.IsOpen && !KebammDoorTransition.IsPlaying && KebammGoalTracking.HasCompletedLevel1())
+            {
+                Debug.Log($"[Kebamm] Goal Tracking auto show after loading ({waited:0.00}s wait)");
                 _goal.Open(true);
+            }
         }
 
         void RefreshPlayerPanel()
@@ -859,6 +894,11 @@ namespace Kebamm
         public void Hide()
         {
             KillTweens();
+            if (_goalAutoOpen != null)
+            {
+                StopCoroutine(_goalAutoOpen);
+                _goalAutoOpen = null;
+            }
             if (_goal != null)
                 _goal.CloseImmediate();
             if (_updateRoot != null)
