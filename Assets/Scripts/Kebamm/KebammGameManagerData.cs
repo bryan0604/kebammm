@@ -64,7 +64,15 @@ namespace Kebamm
         [Tooltip("Seconds of rest between title pulses (Notion title_pulse_interval). 0 = continuous.")]
         public float titlePulseInterval = 5f;
 
-        [Header("Game Result - Stars (GDD: killed / total monsters)")]
+        [Header("Game Result - Stars per category (local tuning, not in Notion yet)")]
+        [Tooltip("Monster star: fraction of the level's monsters destroyed for 1 star. 0.5 = 50%. No monsters in the level = free star.")]
+        [Range(0f, 1f)] public float starMonsterThreshold = 0.5f;
+        [Tooltip("Obstacle star: fraction of the level's obstacles destroyed for 1 star. No obstacles in the level = free star.")]
+        [Range(0f, 1f)] public float starObstacleThreshold = 0.5f;
+        [Tooltip("Trebuchet star: fraction of trebuchets destroyed for 1 star. No trebuchet built this attempt = free star.")]
+        [Range(0f, 1f)] public float starTrebuchetThreshold = 0.5f;
+
+        [Header("Game Result - Stars OLD (killed / total monsters; no longer used, kept until Notion is updated)")]
         [Tooltip("Fraction of the level's monsters killed for 1 star (Notion star_1_threshold). 0.20 = 20%.")]
         [Range(0f, 1f)] public float star1Threshold = 0.20f;
         [Tooltip("Fraction of the level's monsters killed for 2 stars (Notion star_2_threshold). Never below 1 star.")]
@@ -350,6 +358,18 @@ namespace Kebamm
         /// GDD Game Result - Stars: killed / total >= threshold (no rounding). 0 monsters in the level = 0 stars
         /// (nothing to kill; logged as a warning by the caller).
         /// </summary>
+        public float StarMonsterThreshold => Mathf.Clamp01(starMonsterThreshold);
+        public float StarObstacleThreshold => Mathf.Clamp01(starObstacleThreshold);
+        public float StarTrebuchetThreshold => Mathf.Clamp01(starTrebuchetThreshold);
+
+        /// <summary>One category star: 1 when destroyed / total >= threshold (no rounding); 1 for free when the level has none of it.</summary>
+        public static int CategoryStar(int destroyed, int total, float threshold)
+        {
+            if (total <= 0)
+                return 1;
+            return (float)destroyed / total >= threshold ? 1 : 0;
+        }
+
         public int StarsFor(int killed, int total)
         {
             if (total <= 0)

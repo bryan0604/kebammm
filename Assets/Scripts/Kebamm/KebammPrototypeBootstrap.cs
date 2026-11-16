@@ -329,6 +329,21 @@ namespace Kebamm
         KebammTrebuchet _trebuchet;
         /// <summary>Monsters spawned in the current level (stars: killed / total).</summary>
         public int MonstersInLevel => _monsters.Count;
+        /// <summary>Obstacles spawned in the current level (obstacle star).</summary>
+        public int ObstaclesInLevel => _obstacles.Count;
+        public int ObstaclesDestroyed
+        {
+            get
+            {
+                int n = 0;
+                for (int i = 0; i < _obstacles.Count; i++)
+                    if (_obstacles[i] != null && _obstacles[i].IsDestroyed) n++;
+                return n;
+            }
+        }
+        /// <summary>Trebuchets that exist as a target this attempt: only once construction has started (trebuchet star).</summary>
+        public int TrebuchetsInLevel => _trebuchet != null && _trebuchet.IsStarted ? 1 : 0;
+        public int TrebuchetsDestroyed => _trebuchet != null && _trebuchet.IsStarted && _trebuchet.IsDestroyed ? 1 : 0;
         bool _layoutDirty;
 
         void LoadGameManager()

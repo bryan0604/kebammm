@@ -637,26 +637,24 @@ namespace Kebamm
         // GDD cue: Score Screen > 1s > Scores Numbers (Merge Score, Monster Score) > 1s > 3 Stars Logics > 2s > Next Button.
         // Timings come from KebammScoreScreenConfig; each delay counts from the previous step.
         /// <summary>
-        /// GDD Game Result - Stars: killed / total monsters vs Game Manager thresholds (default 20% / 60% / 85%).
+        /// Game Result - Stars: 1 star per category (monsters, obstacles, trebuchet) at >= its threshold; a category not in the level is a free star.
         /// Used for the score screen, the save and the Level Results row (debug console win goes through here too).
         /// </summary>
         static int CalculateStars(KebammPrototypeBootstrap boot)
         {
-            int killed = KebammScore.MonstersDestroyed;
-            int total = boot != null ? boot.MonstersInLevel : 0;
             var gm = boot != null ? boot.GameManagerData : null;
             if (gm == null)
                 gm = Resources.Load<KebammGameManagerData>("Kebamm/GameManager");
             if (gm == null)
                 gm = ScriptableObject.CreateInstance<KebammGameManagerData>();
-            if (total <= 0)
-            {
-                Debug.LogWarning("[Kebamm] Stars earned: 0 (level has 0 monsters - nothing to kill, no stars)");
-                return 0;
-            }
-            int earned = gm.StarsFor(killed, total);
-            float pct = 100f * killed / total;
-            Debug.Log($"[Kebamm] Stars earned: {earned} (killed {killed}/{total} = {pct:0.#}%; thresholds 1:{gm.Star1Threshold * 100f:0.#}% 2:{gm.Star2Threshold * 100f:0.#}% 3:{gm.Star3Threshold * 100f:0.#}%)");
+            int mKilled = KebammScore.MonstersDestroyed, mTotal = boot != null ? boot.MonstersInLevel : 0;
+            int oKilled = boot != null ? boot.ObstaclesDestroyed : 0, oTotal = boot != null ? boot.ObstaclesInLevel : 0;
+            int tKilled = boot != null ? boot.TrebuchetsDestroyed : 0, tTotal = boot != null ? boot.TrebuchetsInLevel : 0;
+            int m = KebammGameManagerData.CategoryStar(mKilled, mTotal, gm.StarMonsterThreshold);
+            int o = KebammGameManagerData.CategoryStar(oKilled, oTotal, gm.StarObstacleThreshold);
+            int tr = KebammGameManagerData.CategoryStar(tKilled, tTotal, gm.StarTrebuchetThreshold);
+            int earned = m + o + tr;
+            Debug.Log($"[Kebamm] Stars earned: {earned} (monsters {mKilled}/{mTotal} -> {m}{(mTotal <= 0 ? " free" : "")}, obstacles {oKilled}/{oTotal} -> {o}{(oTotal <= 0 ? " free" : "")}, trebuchet {tKilled}/{tTotal} -> {tr}{(tTotal <= 0 ? " free" : "")}; thresholds {gm.StarMonsterThreshold * 100f:0.#}% / {gm.StarObstacleThreshold * 100f:0.#}% / {gm.StarTrebuchetThreshold * 100f:0.#}%)");
             return earned;
         }
 

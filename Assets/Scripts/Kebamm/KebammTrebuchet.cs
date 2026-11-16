@@ -63,6 +63,8 @@ namespace Kebamm
         Coroutine _flash;
 
         public bool IsDestroyed => _destroyed;
+        /// <summary>Construction has started this attempt (it now exists as a target for the trebuchet star).</summary>
+        public bool IsStarted => _started;
         public bool IsComplete => _started && _stage >= MaxStages;
         public int Stage => _stage;
         public float Health => _health;

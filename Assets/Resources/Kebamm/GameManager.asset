@@ -31,6 +31,9 @@ MonoBehaviour:
   titlePulseDuration: 0.35
   debugConsoleHoldSeconds: 5
   titlePulseInterval: 5
+  starMonsterThreshold: 0.5
+  starObstacleThreshold: 0.5
+  starTrebuchetThreshold: 0.5
   star1Threshold: 0.2
   star2Threshold: 0.6
   star3Threshold: 0.85
