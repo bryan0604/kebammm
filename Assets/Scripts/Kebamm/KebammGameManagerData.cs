@@ -178,7 +178,7 @@ namespace Kebamm
         [Tooltip("Construction smoke size = trebuchet scale x this. 0 = off (placeholder puff).")]
         [Min(0f)] public float trebuchetSmokeScale = 1f;
 
-        [Header("Score Text Count-up (local tuning, not in Notion until the style is approved)")]
+        [Header("Score Text Count-up (Notion VFX)")]
         [Tooltip("Gameplay HUD: seconds the Score number takes to roll up to the new value. 0 = jump straight.")]
         [Min(0f)] public float scoreHudCountDuration = 0.4f;
         [Tooltip("Gameplay HUD: scale punch on the Score text when points are gained (0.2 = +20%). 0 = no bump.")]

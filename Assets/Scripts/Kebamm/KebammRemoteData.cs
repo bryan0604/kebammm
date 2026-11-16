@@ -413,6 +413,10 @@ namespace Kebamm
             SetFloat(row, "impact_fx_scale", table, "impactFxScale", ref g.impactFxScale);
             SetInt(row, "impact_fx_pool_size", table, "impactFxPoolSize", ref g.impactFxPoolSize);
             SetFloat(row, "trebuchet_smoke_scale", table, "trebuchetSmokeScale", ref g.trebuchetSmokeScale);
+            SetFloat(row, "score_hud_count_duration", table, "scoreHudCountDuration", ref g.scoreHudCountDuration);
+            SetFloat(row, "score_hud_bump", table, "scoreHudBump", ref g.scoreHudBump);
+            SetFloat(row, "score_end_count_duration", table, "scoreEndCountDuration", ref g.scoreEndCountDuration);
+            SetFloat(row, "score_end_bump", table, "scoreEndBump", ref g.scoreEndBump);
             SetFloat(row, "drop_burst_scale", table, "dropBurstScale", ref g.dropBurstScale);
             SetInt(row, "drop_burst_pool_size", table, "dropBurstPoolSize", ref g.dropBurstPoolSize);
             SetInt(row, "firefly_count", table, "fireflyCount", ref g.fireflyCount);
