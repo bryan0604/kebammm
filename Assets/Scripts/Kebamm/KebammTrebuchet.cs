@@ -304,7 +304,7 @@ namespace Kebamm
             _visual.localScale = Vector3.one;
             _visual.DOPunchScale(Vector3.one * 0.18f, 0.3f, 6, 0.6f).SetId(this);
             Play(_stageClip);
-            Vfx(1.2f, new Color(0.85f, 0.75f, 0.55f, 0.55f));
+            Vfx(1.2f, new Color(0.85f, 0.75f, 0.55f, 0.55f), true);
             string text = stage >= MaxStages ? "TREBUCHET READY!" : $"Trebuchet {stage}/{MaxStages}";
             FloatText(text, transform.position + Vector3.up * (2.1f * _data.trebuchetScale), stage >= MaxStages ? ReadyColour : Color.white, 1.1f, stage >= MaxStages ? 1.1f : 0.8f);
             Debug.Log(stage >= MaxStages
@@ -502,8 +502,10 @@ namespace Kebamm
 
         // ---- Placeholder VFX / text ----
 
-        void Vfx(float size, Color colour)
+        void Vfx(float size, Color colour, bool stageUp = false)
         {
+            if (KebammTrebuchetSmokeFx.Play(transform.position + Vector3.up * (0.85f * _data.trebuchetScale), _data.trebuchetScale, stageUp))
+                return; // construction smoke prefab replaces the placeholder circle
             var go = new GameObject("TrebuchetVfx");
             go.transform.position = transform.position + Vector3.up * (0.85f * _data.trebuchetScale);
             go.transform.localScale = Vector3.one * (size * 0.3f);

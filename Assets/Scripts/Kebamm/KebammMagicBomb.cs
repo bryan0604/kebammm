@@ -185,6 +185,7 @@ namespace Kebamm
             }
             Debug.Log($"[Kebamm] Magic Bomb exploded at ({centre.x:0.00}, {centre.y:0.00}) range={range} damage={damage} strength={strength}: balls hit={Hits.Count} destroyed={destroyed} pushed={pushed}");
             Hits.Clear();
+            KebammMagicBombFx.Play(centre, range);
             FlashOverlayAndRelease();
             Destroy(gameObject);
         }

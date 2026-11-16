@@ -156,6 +156,38 @@ namespace Kebamm
         [Range(0f, 1f)] public float titleShineAlpha = 0.7f;
         [Tooltip("Width of the title light strip in UI pixels (Notion VFX title_shine_thickness). <= 0 = 60.")]
         [Min(0f)] public float titleShineThickness = 60f;
+        [Header("Magic Bomb Explosion VFX (Notion VFX)")]
+        [Tooltip("Cartoon FX prefab played where the Magic Bomb explodes (CFXR Explosion 1). Empty = no explosion VFX.")]
+        public GameObject magicBombFxPrefab;
+        [Tooltip("Explosion VFX size = magic_bomb_explode_range x this. 0 = off.")]
+        [Min(0f)] public float magicBombFxScale = 0.25f;
+
+        [Header("Ball Impact Explosion VFX (Notion VFX)")]
+        [Tooltip("Cartoon FX prefab played where a ball explodes on impact (ground, monster, obstacle, trebuchet). CFXR3 Fire Explosion B. Empty = off.")]
+        public GameObject impactFxPrefab;
+        [Tooltip("Impact explosion VFX size = the ball tier's impact_aoe_range x this. 0 = off.")]
+        [Min(0f)] public float impactFxScale = 1f;
+        [Tooltip("Pooled impact explosion instances reused round-robin. <=0 = 12.")]
+        [Min(0)] public int impactFxPoolSize = 12;
+
+        [Header("Trebuchet Construction Smoke VFX (Notion VFX)")]
+        [Tooltip("Cartoon FX prefab played on the trebuchet when construction starts (CFXR2 Poison Cloud). Empty = old placeholder puff.")]
+        public GameObject trebuchetSmokePrefab;
+        [Tooltip("Cartoon FX prefab played on every trebuchet stage increase (CFXR3 Hit Misc F Smoke). Empty = uses the construction start prefab.")]
+        public GameObject trebuchetStageSmokePrefab;
+        [Tooltip("Construction smoke size = trebuchet scale x this. 0 = off (placeholder puff).")]
+        [Min(0f)] public float trebuchetSmokeScale = 1f;
+
+        [Header("Score Text Count-up (local tuning, not in Notion until the style is approved)")]
+        [Tooltip("Gameplay HUD: seconds the Score number takes to roll up to the new value. 0 = jump straight.")]
+        [Min(0f)] public float scoreHudCountDuration = 0.4f;
+        [Tooltip("Gameplay HUD: scale punch on the Score text when points are gained (0.2 = +20%). 0 = no bump.")]
+        [Min(0f)] public float scoreHudBump = 0.2f;
+        [Tooltip("End screen: seconds Merge, Monster and Final Score take to roll up from 0. 0 = show straight away.")]
+        [Min(0f)] public float scoreEndCountDuration = 0.6f;
+        [Tooltip("End screen: scale punch on each score number when its roll finishes. 0 = no bump.")]
+        [Min(0f)] public float scoreEndBump = 0.15f;
+
         [Header("Drop Burst VFX (Notion VFX)")]
         [Tooltip("Burst played where a dropped ball first touches with its bottom side (local asset reference, not in Notion). Empty = no burst.")]
         public GameObject dropBurstPrefab;
@@ -175,7 +207,7 @@ namespace Kebamm
         [Min(0f)] public float fireflyRate = 3f;
         [Tooltip("Multiplier on the pack's dot size. <= 0 = 1.")]
         [Min(0f)] public float fireflySizeScale = 1f;
-        [Header("Combo Dots VFX (local tuning, not in Notion until the style is approved)")]
+        [Header("Combo Dots VFX (Notion VFX)")]
         [Tooltip("Glowing dots flying from a merge to the combo bar at combo 1. Both 0 = off (bar fills instantly as before).")]
         [Min(0)] public int comboDotCountMin = 4;
         [Tooltip("Dots at combo_glow_max_combo and above.")]
@@ -285,6 +317,14 @@ namespace Kebamm
         public float DestroyedFireLifetimeScale => destroyedFireLifetimeScale > 0f ? destroyedFireLifetimeScale : 0.5f;
         public int DestroyedFirePointsMin => Mathf.Max(0, Mathf.Min(destroyedFirePointsMin, destroyedFirePointsMax));
         public int DestroyedFirePointsMax => Mathf.Max(0, Mathf.Max(destroyedFirePointsMin, destroyedFirePointsMax));
+        public float MagicBombFxScale => Mathf.Max(0f, magicBombFxScale);
+        public float ImpactFxScale => Mathf.Max(0f, impactFxScale);
+        public int ImpactFxPoolSize => impactFxPoolSize > 0 ? impactFxPoolSize : 12;
+        public float TrebuchetSmokeScale => Mathf.Max(0f, trebuchetSmokeScale);
+        public float ScoreHudCountDuration => Mathf.Max(0f, scoreHudCountDuration);
+        public float ScoreHudBump => Mathf.Max(0f, scoreHudBump);
+        public float ScoreEndCountDuration => Mathf.Max(0f, scoreEndCountDuration);
+        public float ScoreEndBump => Mathf.Max(0f, scoreEndBump);
         public float DropBurstScale => dropBurstScale > 0f ? dropBurstScale : 1f;
         public int DropBurstPoolSize => dropBurstPoolSize > 0 ? dropBurstPoolSize : 6;
         public int FireflyCount => Mathf.Max(0, fireflyCount);

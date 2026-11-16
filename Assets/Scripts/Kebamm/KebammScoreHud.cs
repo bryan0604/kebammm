@@ -58,6 +58,10 @@ namespace Kebamm
         TextMeshProUGUI _endCoinsValue;
         Image _endCoinsIcon;
         Tween _coinCountTween;
+        // Score text count-up (Fine Tuning DOTween): HUD rolls from the shown value; end screen numbers roll from 0.
+        Tween _hudCountTween;
+        int _hudShown;
+        readonly System.Collections.Generic.List<Tween> _endCountTweens = new System.Collections.Generic.List<Tween>();
 
         /// <summary>Coins earned by the last finished attempt (score screen, save and log all use this).</summary>
         public static int LastCoinsEarned { get; private set; }
@@ -493,16 +497,92 @@ namespace Kebamm
             RefreshLevel();
         }
 
+        static KebammGameManagerData Gm => KebammPrototypeBootstrap.Instance != null ? KebammPrototypeBootstrap.Instance.GameManagerData : null;
+
         public void Refresh()
         {
-            if (_scoreValue != null)
-                _scoreValue.text = "Score: " + KebammScore.FinalScore;
+            RefreshHudScore();
+            if (_ended)
+                return; // end screen numbers are shown by the end sequence count-up
             if (_endMergeValue != null)
                 _endMergeValue.text = KebammScore.MergeScore.ToString();
             if (_endMonsterValue != null)
                 _endMonsterValue.text = KebammScore.MonsterScore.ToString();
             if (_endFinalValue != null)
                 _endFinalValue.text = KebammScore.FinalScore.ToString();
+        }
+
+        // HUD score: rolls up from the shown number to the new one with a scale bump. Drops / resets snap.
+        void RefreshHudScore()
+        {
+            if (_scoreValue == null)
+                return;
+            int target = KebammScore.FinalScore;
+            var gm = Gm;
+            float duration = gm != null ? gm.ScoreHudCountDuration : 0.4f;
+            float bump = gm != null ? gm.ScoreHudBump : 0.2f;
+            Transform tr = _scoreValue.transform;
+            if (target <= _hudShown || duration <= 0f || !isActiveAndEnabled)
+            {
+                if (_hudCountTween != null) { _hudCountTween.Kill(); _hudCountTween = null; }
+                _hudShown = target;
+                _scoreValue.text = "Score: " + target;
+                if (target == 0) { tr.DOKill(); tr.localScale = Vector3.one; }
+                else BumpText(tr, bump);
+                return;
+            }
+            if (_hudCountTween != null)
+                _hudCountTween.Kill();
+            _hudCountTween = DOTween.To(() => _hudShown, v => { _hudShown = v; _scoreValue.text = "Score: " + v; }, target, duration)
+                .SetEase(Ease.OutQuad)
+                .SetLink(_scoreValue.gameObject)
+                .OnComplete(() => _hudCountTween = null);
+            BumpText(tr, bump);
+        }
+
+        static void BumpText(Transform tr, float bump)
+        {
+            tr.DOKill(true);
+            tr.localScale = Vector3.one;
+            if (bump <= 0f)
+                return;
+            tr.DOPunchScale(Vector3.one * bump, 0.25f, 6, 0.8f)
+                .SetLink(tr.gameObject)
+                .OnKill(() => { if (tr != null) tr.localScale = Vector3.one; });
+        }
+
+        // End screen: a number rolls up from 0 to its value, then bumps.
+        void CountEndNumber(TextMeshProUGUI label, int value)
+        {
+            if (label == null)
+                return;
+            var gm = Gm;
+            float duration = gm != null ? gm.ScoreEndCountDuration : 0.6f;
+            float bump = gm != null ? gm.ScoreEndBump : 0.15f;
+            Transform tr = label.transform;
+            tr.DOKill();
+            tr.localScale = Vector3.one;
+            if (duration <= 0f || value <= 0)
+            {
+                label.text = value.ToString();
+                BumpText(tr, bump);
+                return;
+            }
+            int shown = 0;
+            label.text = "0";
+            Tween tw = DOTween.To(() => shown, v => { shown = v; label.text = v.ToString(); }, value, duration)
+                .SetEase(Ease.OutQuad)
+                .SetLink(label.gameObject)
+                .OnComplete(() => { if (label != null) BumpText(label.transform, bump); })
+                .OnKill(() => { if (label != null) label.text = value.ToString(); });
+            _endCountTweens.Add(tw);
+        }
+
+        void KillEndCounts()
+        {
+            for (int i = 0; i < _endCountTweens.Count; i++)
+                if (_endCountTweens[i] != null) _endCountTweens[i].Kill();
+            _endCountTweens.Clear();
         }
 
         public void RefreshLevel()
@@ -622,9 +702,18 @@ namespace Kebamm
             // Merge + Monster > 1s > Final Score > 0.25s > Rewards Earn (count-up) > stars > Next button.
             _endSequence = DOTween.Sequence()
                 .AppendInterval(config.scoreNumbersDelay)
-                .AppendCallback(() => SetScoreNumbersVisible(true))
+                .AppendCallback(() =>
+                {
+                    SetScoreNumbersVisible(true);
+                    CountEndNumber(_endMergeValue, KebammScore.MergeScore);
+                    CountEndNumber(_endMonsterValue, KebammScore.MonsterScore);
+                })
                 .AppendInterval(config.finalScoreDelay)
-                .AppendCallback(() => SetFinalScoreVisible(true))
+                .AppendCallback(() =>
+                {
+                    SetFinalScoreVisible(true);
+                    CountEndNumber(_endFinalValue, KebammScore.FinalScore);
+                })
                 .AppendInterval(config.rewardDelay)
                 .AppendCallback(() => PlayCoinCount(coins, config.rewardCountDuration))
                 .AppendInterval(config.starsDelay)
@@ -646,6 +735,7 @@ namespace Kebamm
                 _endSequence = null;
             }
             KillCoinCount();
+            KillEndCounts();
         }
 
         void KillCoinCount()
@@ -895,6 +985,7 @@ namespace Kebamm
         {
             _ended = false;
             KillEndSequence();
+            Refresh();
             ResetStars();
             SetScoreNumbersVisible(true);
             SetFinalScoreVisible(true);

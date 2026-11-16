@@ -70,6 +70,18 @@ MonoBehaviour:
   titleShineInterval: 3
   titleShineAlpha: 0.7
   titleShineThickness: 60
+  magicBombFxPrefab: {fileID: 2433282508537954060, guid: 3ef3ae421f71c5c4e97fe12dc2fc6312, type: 3}
+  magicBombFxScale: 0.25
+  impactFxPrefab: {fileID: 8194992990867289339, guid: 99bc28c0d45f51c4fbac01080b73edc7, type: 3}
+  impactFxScale: 1
+  impactFxPoolSize: 12
+  trebuchetSmokePrefab: {fileID: 4425129568585013132, guid: bbeeb0ddc21369746aaaae5c5c1c09cf, type: 3}
+  trebuchetStageSmokePrefab: {fileID: 141433446842962269, guid: 9fe8f8b3288e45a44af36ff8aa04486e, type: 3}
+  trebuchetSmokeScale: 1
+  scoreHudCountDuration: 0.4
+  scoreHudBump: 0.2
+  scoreEndCountDuration: 0.6
+  scoreEndBump: 0.15
   dropBurstPrefab: {fileID: 1429954232896169633, guid: 83036083a4ebcd34f98131bd3cf6f4d2, type: 3}
   dropBurstScale: 0.25
   dropBurstPoolSize: 6

@@ -65,6 +65,7 @@ namespace Kebamm
                 }
                 Hit.Clear();
                 ShowFlash(point, range);
+                KebammImpactFx.Play(point, range);
             }
 
             string target = directTarget != null ? directTarget.GetType().Name.Replace("Kebamm", "") : "ground";
